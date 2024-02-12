@@ -1,0 +1,37 @@
+server:
+  port : 8099
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    de.telekom.horizon: ${HORIZON_LOG_LEVEL:INFO}
+
+kubernetes:
+  enabled: true
+  kubeConfigPath: ${user.home}/.kube/config
+  informer: 
+    namespace: integration
+
+horizon:
+  cache:
+    enabled: true
+  kafka:
+    bootstrapServers: ${PULSAR_KAFKA_BROKERS:kafka:9092,localhost:9092}
+    groupId: ${PULSAR_KAFKA_GROUP_ID:pulsar}
+    partitionCount: ${PULSAR_KAFKA_PARTITION_COUNT:10}
+  mongo:
+    url: mongodb://localhost:27017
+
+pulsar:
+  hostname: podDev
+  sseTimeout: ${PULSAR_SSE_TIMEOUT:120000}
+  features:
+    subscriberCheck: false
+  security:
+    oauth: false
+
+management:
+  tracing:
+    enabled: false
+  server:
+    port: 8098

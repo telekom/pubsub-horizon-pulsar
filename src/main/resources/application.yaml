@@ -1,0 +1,82 @@
+spring:
+  mvc:
+    async:
+      request-timeout: -1
+  application:
+    name: Horizon Pulsar
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    de.telekom.horizon: ${HORIZON_LOG_LEVEL:INFO}
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,heapdump,shutdown
+  endpoint:
+    health:
+      show-details: always
+    shutdown:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: ${JAEGER_COLLECTOR_URL:http://jaeger-collector.example.com:9411}
+  tracing:
+    sampling:
+      probability: ${ZIPKIN_SAMPLER_PROBABILITY:1.0}
+
+kubernetes:
+  enabled: true
+  #roverToken:
+  #kubeConfigPath:
+  informer:
+    resyncperiod:
+      # 10 minutes
+      ms: 600000
+    namespace: ${PULSAR_INFORMER_NAMESPACE:integration}
+
+pulsar:
+  hostname: ${HOSTNAME:podId}
+  ssePollDelay: ${PULSAR_SSE_POLL_DELAY:1000}
+  sseTimeout: ${PULSAR_SSE_TIMEOUT:60000}
+  sseBatchSize: ${PULSAR_SSE_BATCH_SIZE:100}
+  threadpool-size: ${PULSAR_THREADPOOL_SIZE:100}
+  queue-capacity: ${PULSAR_QUEUE_CAPACITY:10000}
+  features:
+    subscriberCheck: ${PULSAR_FEATURE_SUBSCRIBER_CHECK:true}
+  security:
+    issuerUrls: ${PULSAR_ISSUER_URL:http://localhost:8080/auth/realms/default}
+    oauth: ${PULSAR_SECURITY_OAUTH:true}
+  defaultEnvironment: ${PULSAR_DEFAULT_ENVIRONMENT:integration}
+
+horizon:
+  cache:
+    enabled: true
+    deDuplication:
+      enabled: ${PULSAR_CACHE_DE_DUPLICATION_ENABLED:true}
+      defaultCacheName: pulsar-deduplication
+
+  kafka:
+    bootstrapServers: ${PULSAR_KAFKA_BROKERS:kafka:9092}
+    partitionCount: ${PULSAR_KAFKA_PARTITION_COUNT:10}
+    groupId: ${PULSAR_KAFKA_GROUP_ID:pulsar}
+    disableGroupId: true
+    lingerMs: ${PULSAR_KAFKA_LINGER_MS:5}
+    acks: ${PULSAR_KAFKA_ACKS:1}
+    compression:
+      enabled: ${PULSAR_KAFKA_COMPRESSION_ENABLED:false}
+      type: ${PULSAR_KAFKA_COMPRESSION_TYPE:none}
+  mongo:
+    enabled: true
+
+pandora:
+  tracing:
+    name: horizon
+
+
+
+
