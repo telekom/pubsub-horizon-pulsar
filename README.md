@@ -1,3 +1,9 @@
+<!--
+Copyright 2024 Deutsche Telekom IT GmbH
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 <img src="docs/img/pulsar.svg" alt="pulsar-logo" height="250px"/>
 <h1>Pulsar</h1>
 

@@ -1,3 +1,9 @@
+<!--
+Copyright 2024 Deutsche Telekom IT GmbH
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Architecture
 The main function of the Pulsar component is to facilitate the delivery of subscription-based event messages to subscribers, using Server-Sent Events (SSE) for the delivery type.
 Event consumers can interact with the component by sending a GET request to the endpoint with the value /sse/{subscriptionId}. This allows event consumers to manually retrieve the events associated with their subscription.
