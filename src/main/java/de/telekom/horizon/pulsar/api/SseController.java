@@ -29,7 +29,7 @@ import java.util.Objects;
 @RequestMapping("/v1/{environment}")
 public class SseController {
 
-    private static final String APPLICATION_STREAM_JSON_VALUE = "application/stream+json"; //Sonar code smell
+    private static final String APPLICATION_STREAM_JSON_VALUE = "application/stream+json";
 
     private final SseService sseService;
 
