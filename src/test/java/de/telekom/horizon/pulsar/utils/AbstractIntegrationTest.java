@@ -22,7 +22,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("management.tracing.enabled", () -> false);
         registry.add("management.tracing.endpoint", () -> "http://localhost:9411");
         registry.add("horizon.kafka.bootstrapServers", broker::getBrokersAsString);
-        registry.add("horizon.victorialog.enabled", () -> false);
     }
 
 }
