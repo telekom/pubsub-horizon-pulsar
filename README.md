@@ -4,8 +4,10 @@ Copyright 2024 Deutsche Telekom IT GmbH
 SPDX-License-Identifier: Apache-2.0
 -->
 
-<img src="docs/img/pulsar.svg" alt="pulsar-logo" height="250px"/>
-<h1>Pulsar</h1>
+<p align="center">
+  <img src="docs/img/pulsar.svg" alt="Pulsar logo" width="200">
+  <h1 align="center">Pulsar</h1>
+</p>
 
 <p align="center">
   Horizon component for the delivery of eventMessages with deliveryType SSE.
