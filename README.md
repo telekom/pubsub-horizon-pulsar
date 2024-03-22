@@ -29,6 +29,8 @@ SPDX-License-Identifier: Apache-2.0
 Pulsar is a Horizon component that is responsible for the SSE delivery of event messages to customers that actively call the /sse 
 REST endpoint together with their subscriptionId as path parameter.
 
+> **Note:** Pulsar is an essential part of the Horizon ecosystem. Please refer to [documentation of the entire system](https://github.com/telekom/pubsub-horizon) to get the full picture.
+
 ## Prerequisites
 For the optimal setup, ensure you have:
 
