@@ -4,13 +4,20 @@
 
 package de.telekom.horizon.pulsar.cache;
 
+import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
+import de.telekom.eni.pandora.horizon.cache.util.Query;
+import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.micrometer.core.instrument.Tags;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,26 +31,27 @@ import static de.telekom.eni.pandora.horizon.metrics.HorizonMetricsConstants.*;
  * associated with a unique key generated from the environment and subscriptionId.
  */
 @Component
+@Slf4j
 public class ConnectionGaugeCache {
 
     private final PulsarConfig pulsarConfig;
 
-    private final KubernetesClient kubernetesClient;
+    private final JsonCacheService<SubscriptionResource> cache;
+
+    private final ConcurrentHashMap<String, AtomicInteger> metricsCache = new ConcurrentHashMap<>();
 
     private final HorizonMetricsHelper metricsHelper;
-
-    private final ConcurrentHashMap<String, AtomicInteger> cache = new ConcurrentHashMap<>();
 
     /**
      * Constructs an instance of {@code ConnectionGaugeCache} with the specified dependencies.
      *
      * @param pulsarConfig   Configuration for Pulsar.
-     * @param kubernetesClient   Kubernetes client for interacting with resources.
+     * @param cache          Cache for storing subscription resources.
      * @param metricsHelper  Helper for managing Horizon metrics.
      */
-    public ConnectionGaugeCache(PulsarConfig pulsarConfig, KubernetesClient kubernetesClient, HorizonMetricsHelper metricsHelper) {
+    public ConnectionGaugeCache(PulsarConfig pulsarConfig, JsonCacheService<SubscriptionResource> cache, HorizonMetricsHelper metricsHelper) {
         this.pulsarConfig = pulsarConfig;
-        this.kubernetesClient = kubernetesClient;
+        this.cache = cache;
         this.metricsHelper = metricsHelper;
     }
 
@@ -55,7 +63,7 @@ public class ConnectionGaugeCache {
      * @return A gauge representing the number of open SSE connections for the specified subscription.
      */
     public AtomicInteger getOrCreateGaugeForSubscription(String environment, String subscriptionId) {
-        return cache.computeIfAbsent(keyOf(environment, subscriptionId), p -> createGaugeForSubscription(environment, subscriptionId));
+        return metricsCache.computeIfAbsent(keyOf(environment, subscriptionId), p -> createGaugeForSubscription(environment, subscriptionId));
     }
 
     /**
@@ -82,8 +90,33 @@ public class ConnectionGaugeCache {
      * @return A gauge measuring the number of open SSE connections for the specified subscription.
      */
     private AtomicInteger createGaugeForSubscription(String environment, String subscriptionId) {
-        var resource = kubernetesClient.resources(SubscriptionResource.class).inNamespace(pulsarConfig.getNamespace()).withName(subscriptionId).get();
-        var tags = buildTagsForSseSubscription(environment, resource);
+
+        var env = environment;
+        if (Objects.equals(pulsarConfig.getDefaultEnvironment(), environment)) {
+            env = "default";
+        }
+
+        var builder = Query.builder(SubscriptionResource.class)
+                .addMatcher("spec.environment", env)
+                .addMatcher("spec.subscription.subscriptionId", subscriptionId);
+
+        List<SubscriptionResource> list = new ArrayList<>();
+        try {
+            list = cache.getQuery(builder.build());
+
+        } catch (JsonCacheException e) {
+            log.error("Error occurred while executing query on JsonCacheService", e);
+        }
+
+        var resource = list.stream()
+                .findFirst()
+                .orElse(null);
+
+        Tags tags = Tags.empty();
+
+        if (resource != null) {
+                tags = buildTagsForSseSubscription(environment, resource);
+        }
 
         return metricsHelper.getRegistry().gauge(METRIC_OPEN_SSE_CONNECTIONS, tags, new AtomicInteger(0));
     }

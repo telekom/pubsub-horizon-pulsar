@@ -30,7 +30,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class SseTaskFactory {
     private final PulsarConfig pulsarConfig;
-    private final KubernetesClient kubernetesClient;
     private final ConnectionCache connectionCache;
     private final ConnectionGaugeCache connectionGaugeCache;
     private final KafkaPicker kafkaPicker;
@@ -43,7 +42,6 @@ public class SseTaskFactory {
      * Constructs an instance of {@code SseTaskFactory}.
      *
      * @param pulsarConfig           The {@link PulsarConfig} for Pulsar-related configuration.
-     * @param kubernetesClient       The {@link KubernetesClient} for interacting with Kubernetes resources.
      * @param connectionCache        The {@link ConnectionCache} for managing connections.
      * @param connectionGaugeCache   The {@link ConnectionGaugeCache} for caching connection gauges.
      * @param kafkaPicker            The {@link KafkaPicker} for picking Kafka events.
@@ -54,7 +52,6 @@ public class SseTaskFactory {
      */
     public SseTaskFactory(
             PulsarConfig pulsarConfig,
-            KubernetesClient kubernetesClient,
             ConnectionCache connectionCache,
             ConnectionGaugeCache connectionGaugeCache,
             EventWriter eventWriter,
@@ -68,7 +65,6 @@ public class SseTaskFactory {
         this.kafkaPicker = kafkaPicker;
         this.messageStateMongoRepo = messageStateMongoRepo;
         this.tracingHelper = tracingHelper;
-        this.kubernetesClient = kubernetesClient;
         this.connectionCache = connectionCache;
         this.deDuplicationService = deDuplicationService;
 
@@ -105,14 +101,16 @@ public class SseTaskFactory {
      * @param connection       The {@link SseTask} representing the connection.
      */
     private void claimConnectionForSubscription(String environment, String subscriptionId, SseTask connection) {
-        var resource = kubernetesClient.resources(SubscriptionResource.class)
-                .inNamespace(pulsarConfig.getNamespace())
-                .withName(subscriptionId).get();
-
-        if (resource != null) {
-            resource.getSpec().setSseActiveOnPod(pulsarConfig.getPodName());
-
-            kubernetesClient.resources(SubscriptionResource.class).inNamespace(pulsarConfig.getNamespace()).replace(resource);
+        // ToDo Replace with new logic based on a haselcast map
+//        var resource = kubernetesClient.resources(SubscriptionResource.class)
+//                .inNamespace(pulsarConfig.getNamespace())
+//                .withName(subscriptionId).get();
+//
+//        if (resource != null) {
+//            resource.getSpec().setSseActiveOnPod(pulsarConfig.getPodName());
+//
+//
+//            kubernetesClient.resources(SubscriptionResource.class).inNamespace(pulsarConfig.getNamespace()).replace(resource);
 
             connectionCache.addConnectionForSubscription(environment, subscriptionId, connection);
         }
