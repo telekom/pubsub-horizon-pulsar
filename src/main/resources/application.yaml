@@ -50,6 +50,7 @@ pulsar:
 horizon:
   cache:
     enabled: true
+    kubernetesServiceDns: ${PULSAR_CACHE_SERVICE_DNS:quasar-discovery-headless.integration.svc.cluster.local}
     deDuplication:
       enabled: ${PULSAR_CACHE_DE_DUPLICATION_ENABLED:true}
       defaultCacheName: pulsar-deduplication
