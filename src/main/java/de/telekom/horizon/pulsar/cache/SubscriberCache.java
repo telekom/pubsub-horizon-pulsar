@@ -6,7 +6,6 @@ package de.telekom.horizon.pulsar.cache;
 
 
 import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.cache.util.Query;
 import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
@@ -14,10 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
 @Component
 @Slf4j
@@ -32,28 +28,14 @@ public class SubscriberCache {
         this.cache = cache;
     }
 
-    public String getSubscriberId(String environment, String subscriptionId) {
-
-        var env = environment;
-        if (Objects.equals(pulsarConfig.getDefaultEnvironment(), environment)) {
-            env = "default";
-        }
-
-        var builder = Query.builder(SubscriptionResource.class)
-                .addMatcher("spec.environment", env)
-                .addMatcher("spec.subscription.subscriptionId", subscriptionId);
-
-        List<SubscriptionResource> list = new ArrayList<>();
+    public Optional<String> getSubscriberId(String subscriptionId) {
+        Optional<SubscriptionResource> subscription = Optional.empty();
         try {
-            list = cache.getQuery(builder.build());
-
+            subscription = cache.getByKey(subscriptionId);
         } catch (JsonCacheException e) {
             log.error("Error occurred while executing query on JsonCacheService", e);
         }
 
-        return list.stream()
-                .map(sr -> sr.getSpec().getSubscription().getSubscriberId())
-                .findFirst()
-                .orElse(null);
+        return subscription.map(subscriptionResource -> subscriptionResource.getSpec().getSubscription().getSubscriberId());
     }
 }

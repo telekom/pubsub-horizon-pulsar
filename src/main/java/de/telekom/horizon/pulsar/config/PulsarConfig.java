@@ -30,12 +30,6 @@ public class PulsarConfig {
     @Value("${pulsar.queue-capacity}")
     private int queueCapacity;
 
-    @Value("${pulsar.hostname:podId}")
-    private String podName;
-
-    @Value("${kubernetes.informer.namespace:default}")
-    private String namespace;
-
     @Value("${pulsar.defaultEnvironment}")
     private String defaultEnvironment;
 }

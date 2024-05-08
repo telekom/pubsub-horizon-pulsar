@@ -6,7 +6,6 @@ package de.telekom.horizon.pulsar.service;
 
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
-import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
@@ -14,7 +13,6 @@ import de.telekom.horizon.pulsar.cache.ConnectionGaugeCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
 
@@ -88,31 +86,8 @@ public class SseTaskFactory {
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);
         task.setContentType(contentType);
 
-        claimConnectionForSubscription(environment, subscriptionId, task);
+        connectionCache.claimConnectionForSubscription(subscriptionId, task);
 
         return task;
-    }
-
-    /**
-     * Claims the connection for the specified subscription by updating Kubernetes resources and connection cache.
-     *
-     * @param environment      The environment associated with the subscription.
-     * @param subscriptionId   The ID of the subscription for which the connection is claimed.
-     * @param connection       The {@link SseTask} representing the connection.
-     */
-    private void claimConnectionForSubscription(String environment, String subscriptionId, SseTask connection) {
-        // ToDo Replace with new logic based on a haselcast map
-//        var resource = kubernetesClient.resources(SubscriptionResource.class)
-//                .inNamespace(pulsarConfig.getNamespace())
-//                .withName(subscriptionId).get();
-//
-//        if (resource != null) {
-//            resource.getSpec().setSseActiveOnPod(pulsarConfig.getPodName());
-//
-//
-//            kubernetesClient.resources(SubscriptionResource.class).inNamespace(pulsarConfig.getNamespace()).replace(resource);
-
-            connectionCache.addConnectionForSubscription(environment, subscriptionId, connection);
-        }
     }
 }

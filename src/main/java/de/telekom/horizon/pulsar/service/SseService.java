@@ -82,7 +82,8 @@ public class SseService {
         if (pulsarConfig.isEnableSubscriberCheck()) {
             var subscriberId = tokenService.getSubscriberId();
 
-            if (Strings.isBlank(subscriberId) || !subscriberId.equals(subscriberCache.getSubscriberId(environment, subscriptionId))) {
+            var oSubscriberId = subscriberCache.getSubscriberId(subscriptionId);
+            if (Strings.isBlank(subscriberId) || oSubscriberId.isEmpty() || !subscriberId.equals(oSubscriberId.get())) {
                 throw new SubscriberDoesNotMatchSubscriptionException(String.format("The subscription does not belong to subscriber with id '%s'", subscriberId));
             }
         }

@@ -4,10 +4,16 @@
 
 package de.telekom.horizon.pulsar.cache;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.topic.ITopic;
+import com.hazelcast.topic.Message;
+import com.hazelcast.topic.MessageListener;
+import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -19,30 +25,37 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Component
-public class ConnectionCache {
+public class ConnectionCache implements MessageListener<WorkerClaim> {
 
-    // environment--subscriptionId -> SseTask
+    // subscriptionId -> SseTask
     private final ConcurrentHashMap<String, SseTask> map = new ConcurrentHashMap<>();
 
-    /**
-     * Adds an SSE connection to the cache for the specified subscription.
-     *
-     * @param environment The environment associated with the subscription.
-     * @param subscriptionId The unique identifier for the subscription.
-     * @param pollTask The SSE task representing the connection to be added.
-     */
-    public void addConnectionForSubscription(String environment, String subscriptionId, SseTask pollTask) {
-        terminateConnection(map.put(keyOf(environment, subscriptionId), pollTask));
+    private final UUID workerId;
+
+    private final ITopic<WorkerClaim> workers;
+
+    public ConnectionCache(HazelcastInstance hazelcastInstance) {
+        this.workerId = hazelcastInstance.getCluster().getLocalMember().getUuid();
+        this.workers = hazelcastInstance.getTopic("workers");
+        workers.addMessageListener(this);
+    }
+
+    @Override
+    public void onMessage(Message<WorkerClaim> workerClaim) {
+        var isLocalMember = workerClaim.getPublishingMember().getUuid().compareTo(workerId) == 0;
+        if (!isLocalMember) {
+            var subscriptionId = workerClaim.getMessageObject().getSubscriptionId();
+            removeConnectionForSubscription(subscriptionId);
+        }
     }
 
     /**
      * Removes the SSE connection from the cache for the specified subscription.
      *
-     * @param environment The environment associated with the subscription.
      * @param subscriptionId The unique identifier for the subscription.
      */
-    public void removeConnectionForSubscription(String environment, String subscriptionId) {
-        terminateConnection(map.remove(keyOf(environment, subscriptionId)));
+    public void removeConnectionForSubscription(String subscriptionId) {
+        terminateConnection(map.remove(subscriptionId));
     }
 
     /**
@@ -57,13 +70,13 @@ public class ConnectionCache {
     }
 
     /**
-     * Generates a unique key for the cache using the environment and subscriptionId.
+     * Claims the connection for the specified subscription and updates the local connection cache.
      *
-     * @param environment The environment associated with the subscription.
-     * @param subscriptionId The unique identifier for the subscription.
-     * @return A unique key for the cache based on the provided environment and subscriptionId.
+     * @param subscriptionId   The ID of the subscription for which the connection is claimed.
+     * @param connection       The {@link SseTask} representing the connection.
      */
-    private String keyOf(String environment, String subscriptionId) {
-        return String.format("%s--%s", environment, subscriptionId);
+    public void claimConnectionForSubscription(String subscriptionId, SseTask connection) {
+        workers.publish(new WorkerClaim(subscriptionId));
+        terminateConnection(map.put(subscriptionId, connection));
     }
 }

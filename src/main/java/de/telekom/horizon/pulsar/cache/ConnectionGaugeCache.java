@@ -5,19 +5,15 @@
 package de.telekom.horizon.pulsar.cache;
 
 import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.cache.util.Query;
 import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -63,17 +59,18 @@ public class ConnectionGaugeCache {
      * @return A gauge representing the number of open SSE connections for the specified subscription.
      */
     public AtomicInteger getOrCreateGaugeForSubscription(String environment, String subscriptionId) {
-        return metricsCache.computeIfAbsent(keyOf(environment, subscriptionId), p -> createGaugeForSubscription(environment, subscriptionId));
+        return metricsCache.computeIfAbsent(keyOf(environment, subscriptionId), p -> createGaugeForSubscription(subscriptionId));
     }
 
     /**
      * Builds tags for identifying SSE subscriptions in metrics.
      *
-     * @param environment The environment associated with the subscription.
      * @param resource    The Kubernetes Subscription resource.
      * @return Tags for identifying SSE subscriptions in metrics.
      */
-    private Tags buildTagsForSseSubscription(String environment, SubscriptionResource resource) {
+    private Tags buildTagsForSseSubscription(SubscriptionResource resource) {
+        var environment = Optional.ofNullable(resource.getSpec().getEnvironment()).orElse(pulsarConfig.getDefaultEnvironment());
+
         return Tags.of(
                 TAG_ENVIRONMENT, environment,
                 TAG_EVENT_TYPE, resource.getSpec().getSubscription().getType(),
@@ -85,37 +82,22 @@ public class ConnectionGaugeCache {
     /**
      * Creates a gauge for measuring the number of open SSE connections for the specified subscription.
      *
-     * @param environment   The environment associated with the subscription.
      * @param subscriptionId The unique identifier for the subscription.
      * @return A gauge measuring the number of open SSE connections for the specified subscription.
      */
-    private AtomicInteger createGaugeForSubscription(String environment, String subscriptionId) {
-
-        var env = environment;
-        if (Objects.equals(pulsarConfig.getDefaultEnvironment(), environment)) {
-            env = "default";
-        }
-
-        var builder = Query.builder(SubscriptionResource.class)
-                .addMatcher("spec.environment", env)
-                .addMatcher("spec.subscription.subscriptionId", subscriptionId);
-
-        List<SubscriptionResource> list = new ArrayList<>();
+    private AtomicInteger createGaugeForSubscription(String subscriptionId) {
+        Optional<SubscriptionResource> oSubscription = Optional.empty();
         try {
-            list = cache.getQuery(builder.build());
-
+            oSubscription = cache.getByKey(subscriptionId);
         } catch (JsonCacheException e) {
             log.error("Error occurred while executing query on JsonCacheService", e);
         }
 
-        var resource = list.stream()
-                .findFirst()
-                .orElse(null);
-
         Tags tags = Tags.empty();
 
-        if (resource != null) {
-                tags = buildTagsForSseSubscription(environment, resource);
+        if (oSubscription.isPresent()) {
+            var subscription = oSubscription.get();
+            tags = buildTagsForSseSubscription(subscription);
         }
 
         return metricsHelper.getRegistry().gauge(METRIC_OPEN_SSE_CONNECTIONS, tags, new AtomicInteger(0));

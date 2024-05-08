@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.config.KafkaProperties;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
-import de.telekom.eni.pandora.horizon.kubernetes.SubscriptionResourceListener;
 import de.telekom.eni.pandora.horizon.model.db.Coordinates;
 import de.telekom.eni.pandora.horizon.model.db.PartialEvent;
 import de.telekom.eni.pandora.horizon.model.db.State;
@@ -29,7 +28,6 @@ import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.service.SseTaskFactory;
 import de.telekom.horizon.pulsar.service.TokenService;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import lombok.Getter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -60,11 +58,9 @@ public class MockHelper {
     public static PulsarConfig pulsarConfig;
     public static MessageStateMongoRepo messageStateMongoRepo;
     public static HorizonTracer tracingHelper;
-    public static SubscriptionResourceListener subscriptionResourceListener;
     public static SseTaskFactory sseTaskFactory;
     public static Environment environment;
     public static ResponseBodyEmitter emitter;
-    public static KubernetesClient kubernetesClient;
     public static TokenService tokenService;
 
     public static DeDuplicationService deDuplicationService;
@@ -90,10 +86,8 @@ public class MockHelper {
         pulsarConfig = mock(PulsarConfig.class);
         messageStateMongoRepo = mock(MessageStateMongoRepo.class);
         tracingHelper = mock(HorizonTracer.class);
-        subscriptionResourceListener = mock(SubscriptionResourceListener.class);
         environment = mock(Environment.class);
         emitter = mock(ResponseBodyEmitter.class);
-        kubernetesClient = mock(KubernetesClient.class);
         tokenService = mock(TokenService.class);
         deDuplicationService = mock(DeDuplicationService.class);
 
@@ -105,7 +99,7 @@ public class MockHelper {
         lenient().when(pulsarConfig.getQueueCapacity()).thenReturn(100);
 
         kafkaPicker = new KafkaPicker(kafkaTemplate);
-        sseTaskFactory = new SseTaskFactory(pulsarConfig, kubernetesClient, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, tracingHelper);
+        sseTaskFactory = new SseTaskFactory(pulsarConfig, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, tracingHelper);
     }
 
     public static SubscriptionEventMessage createSubscriptionEventMessageForTesting(DeliveryType deliveryType, boolean withAdditionalFields) {
