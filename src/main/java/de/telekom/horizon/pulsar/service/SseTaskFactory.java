@@ -6,7 +6,6 @@ package de.telekom.horizon.pulsar.service;
 
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
-import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
@@ -14,7 +13,6 @@ import de.telekom.horizon.pulsar.cache.ConnectionGaugeCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +28,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class SseTaskFactory {
     private final PulsarConfig pulsarConfig;
-    private final KubernetesClient kubernetesClient;
     private final ConnectionCache connectionCache;
     private final ConnectionGaugeCache connectionGaugeCache;
     private final KafkaPicker kafkaPicker;
@@ -43,7 +40,6 @@ public class SseTaskFactory {
      * Constructs an instance of {@code SseTaskFactory}.
      *
      * @param pulsarConfig           The {@link PulsarConfig} for Pulsar-related configuration.
-     * @param kubernetesClient       The {@link KubernetesClient} for interacting with Kubernetes resources.
      * @param connectionCache        The {@link ConnectionCache} for managing connections.
      * @param connectionGaugeCache   The {@link ConnectionGaugeCache} for caching connection gauges.
      * @param kafkaPicker            The {@link KafkaPicker} for picking Kafka events.
@@ -54,7 +50,6 @@ public class SseTaskFactory {
      */
     public SseTaskFactory(
             PulsarConfig pulsarConfig,
-            KubernetesClient kubernetesClient,
             ConnectionCache connectionCache,
             ConnectionGaugeCache connectionGaugeCache,
             EventWriter eventWriter,
@@ -68,7 +63,6 @@ public class SseTaskFactory {
         this.kafkaPicker = kafkaPicker;
         this.messageStateMongoRepo = messageStateMongoRepo;
         this.tracingHelper = tracingHelper;
-        this.kubernetesClient = kubernetesClient;
         this.connectionCache = connectionCache;
         this.deDuplicationService = deDuplicationService;
 
@@ -92,29 +86,8 @@ public class SseTaskFactory {
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);
         task.setContentType(contentType);
 
-        claimConnectionForSubscription(environment, subscriptionId, task);
+        connectionCache.claimConnectionForSubscription(subscriptionId, task);
 
         return task;
-    }
-
-    /**
-     * Claims the connection for the specified subscription by updating Kubernetes resources and connection cache.
-     *
-     * @param environment      The environment associated with the subscription.
-     * @param subscriptionId   The ID of the subscription for which the connection is claimed.
-     * @param connection       The {@link SseTask} representing the connection.
-     */
-    private void claimConnectionForSubscription(String environment, String subscriptionId, SseTask connection) {
-        var resource = kubernetesClient.resources(SubscriptionResource.class)
-                .inNamespace(pulsarConfig.getNamespace())
-                .withName(subscriptionId).get();
-
-        if (resource != null) {
-            resource.getSpec().setSseActiveOnPod(pulsarConfig.getPodName());
-
-            kubernetesClient.resources(SubscriptionResource.class).inNamespace(pulsarConfig.getNamespace()).replace(resource);
-
-            connectionCache.addConnectionForSubscription(environment, subscriptionId, connection);
-        }
     }
 }

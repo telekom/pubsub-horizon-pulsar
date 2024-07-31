@@ -36,7 +36,6 @@ For the optimal setup, ensure you have:
 
 - A running instance of Kafka
 - A running instance of MongoDB
-- Access to a Kubernetes cluster on which the `Subscription` (subscriber.horizon.telekom.de) custom resource definition has been registered
 
 ## Building Pulsar
 
@@ -69,7 +68,6 @@ Pulsar configuration is managed through environment variables. Check the [comple
 ## Running Pulsar
 ### Locally
 Before you can run Pulsar locally you must have a running instance of Kafka and MongoDB locally or forwarded from a remote cluster.
-Additionally, you need to have a Kubernetes config at `${user.home}/.kube/config.main` that points to the cluster you want to use.
 
 After that you can run Pulsar in a dev mode using this command:
 ```shell

@@ -5,7 +5,6 @@
 package de.telekom.horizon.pulsar.service;
 
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
-import de.telekom.eni.pandora.horizon.kubernetes.SubscriptionResourceListener;
 import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service class for handling Server-Sent Events (SSE).
- *
  * This class, annotated with {@code @Slf4j} and {@code @Service}, provides functionality
  * for managing Server-Sent Events. It includes methods for initializing a thread pool, starting
  * a subscription resource listener, validating subscriberIds for subscriptions, and initiating
@@ -33,7 +31,6 @@ public class SseService {
 
     private final TokenService tokenService;
     private final SseTaskFactory sseTaskFactory;
-    private final SubscriptionResourceListener subscriptionResourceListener;
     private final SubscriberCache subscriberCache;
     private final PulsarConfig pulsarConfig;
     private final ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
@@ -43,7 +40,6 @@ public class SseService {
      *
      * @param tokenService                  The {@link TokenService} for handling token-related operations.
      * @param sseTaskFactory                The {@link SseTaskFactory} for creating Server-Sent Event tasks.
-     * @param subscriptionResourceListener The {@link SubscriptionResourceListener} for managing subscription resources.
      * @param subscriberCache               The {@link SubscriberCache} for caching subscriber information.
      * @param pulsarConfig                  The {@link PulsarConfig} for Pulsar-related configuration.
      * @param deDuplicationService          The {@link DeDuplicationService} for handling message deduplication.
@@ -51,14 +47,12 @@ public class SseService {
     @Autowired
     public SseService(TokenService tokenService,
                       SseTaskFactory sseTaskFactory,
-                      SubscriptionResourceListener subscriptionResourceListener,
                       SubscriberCache subscriberCache,
                       PulsarConfig pulsarConfig,
                       DeDuplicationService deDuplicationService) {
 
         this.tokenService = tokenService;
         this.sseTaskFactory = sseTaskFactory;
-        this.subscriptionResourceListener = subscriptionResourceListener;
         this.subscriberCache = subscriberCache;
         this.pulsarConfig = pulsarConfig;
 
@@ -74,19 +68,8 @@ public class SseService {
         this.taskExecutor.setQueueCapacity(pulsarConfig.getQueueCapacity());
         this.taskExecutor.afterPropertiesSet();
 
-        initSubscriptionResourceListeners();
     }
 
-    /**
-     * Initializes and starts the subscription resource listeners if available.
-     */
-    private void initSubscriptionResourceListeners() {
-        if (subscriptionResourceListener != null) {
-            subscriptionResourceListener.start();
-
-            log.info("SubscriptionResourceListener started.");
-        }
-    }
 
     /**
      * Validates that the subscriberID matches the subscription, throwing an exception if not.
@@ -99,7 +82,8 @@ public class SseService {
         if (pulsarConfig.isEnableSubscriberCheck()) {
             var subscriberId = tokenService.getSubscriberId();
 
-            if (Strings.isBlank(subscriberId) || !subscriberId.equals(subscriberCache.get(environment, subscriptionId))) {
+            var oSubscriberId = subscriberCache.getSubscriberId(subscriptionId);
+            if (Strings.isBlank(subscriberId) || oSubscriberId.isEmpty() || !subscriberId.equals(oSubscriberId.get())) {
                 throw new SubscriberDoesNotMatchSubscriptionException(String.format("The subscription does not belong to subscriber with id '%s'", subscriberId));
             }
         }

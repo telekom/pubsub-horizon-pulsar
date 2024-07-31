@@ -5,56 +5,37 @@
 package de.telekom.horizon.pulsar.cache;
 
 
+import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
+import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
+import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
+import de.telekom.horizon.pulsar.config.PulsarConfig;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
 @Component
+@Slf4j
 public class SubscriberCache {
 
-    //environment--subscriptionId -> subscriberId]
-    private final ConcurrentHashMap<String, String> map = new ConcurrentHashMap<>();
+    private final PulsarConfig pulsarConfig;
 
-    /**
-     * Adds a subscriberId to the cache for the specified subscription.
-     *
-     * @param environment     The environment associated with the subscription.
-     * @param subscriptionId  The unique identifier for the subscription.
-     * @param subscriberId    The identifier for the subscriber to be added.
-     */
-    public void add(String environment, String subscriptionId, String subscriberId) {
-        map.put(keyOf(environment, subscriptionId), subscriberId);
+    private final JsonCacheService<SubscriptionResource> cache;
+    @Autowired
+    public SubscriberCache(PulsarConfig pulsarConfig, JsonCacheService<SubscriptionResource> cache) {
+        this.pulsarConfig = pulsarConfig;
+        this.cache = cache;
     }
 
-    /**
-     * Removes the subscriberId from the cache for the specified subscription.
-     *
-     * @param environment     The environment associated with the subscription.
-     * @param subscriptionId  The unique identifier for the subscription.
-     */
-    public void remove(String environment, String subscriptionId) {
-        map.remove(keyOf(environment, subscriptionId));
-    }
+    public Optional<String> getSubscriberId(String subscriptionId) {
+        Optional<SubscriptionResource> subscription = Optional.empty();
+        try {
+            subscription = cache.getByKey(subscriptionId);
+        } catch (JsonCacheException e) {
+            log.error("Error occurred while executing query on JsonCacheService", e);
+        }
 
-    /**
-     * Retrieves the subscriberId for the specified subscription.
-     *
-     * @param environment     The environment associated with the subscription.
-     * @param subscriptionId  The unique identifier for the subscription.
-     * @return The subscriberId associated with the specified subscription, or {@code null} if not found.
-     */
-    public String get(String environment, String subscriptionId) {
-        return map.get(keyOf(environment, subscriptionId));
-    }
-
-    /**
-     * Generates a unique key for the cache using the environment and subscriptionId.
-     *
-     * @param environment     The environment associated with the subscription.
-     * @param subscriptionId  The unique identifier for the subscription.
-     * @return A unique key for the cache based on the provided environment and subscriptionId.
-     */
-    private String keyOf(String environment, String subscriptionId) {
-        return String.format("%s--%s", environment, subscriptionId);
+        return subscription.map(subscriptionResource -> subscriptionResource.getSpec().getSubscription().getSubscriberId());
     }
 }

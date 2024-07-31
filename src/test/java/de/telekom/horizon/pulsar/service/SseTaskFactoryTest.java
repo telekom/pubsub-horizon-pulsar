@@ -4,17 +4,18 @@
 
 package de.telekom.horizon.pulsar.service;
 
+import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
+import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
+import de.telekom.eni.pandora.horizon.kubernetes.resource.Subscription;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResourceSpec;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
-import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.server.mock.EnableKubernetesMockClient;
-import io.fabric8.kubernetes.client.server.mock.KubernetesMockServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -25,42 +26,36 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@EnableKubernetesMockClient(crud = true)
 class SseTaskFactoryTest {
 
-    KubernetesClient kubernetesClient;
-    KubernetesMockServer server;
+    @Mock
+    JsonCacheService<SubscriptionResource> jsonCacheService;
 
     SseTaskFactory sseTaskFactorySpy;
-
-    final String namespace = "default";
-    final String podName = "foobar";
 
     @BeforeEach
     void setupSseTaskFactoryTest() {
         MockHelper.init();
 
-        when(MockHelper.pulsarConfig.getNamespace()).thenReturn(namespace);
-        when(MockHelper.pulsarConfig.getPodName()).thenReturn(podName);
-
-        sseTaskFactorySpy = spy(new SseTaskFactory(MockHelper.pulsarConfig, kubernetesClient, MockHelper.connectionCache, MockHelper.connectionGaugeCache, MockHelper.eventWriter, MockHelper.kafkaPicker, MockHelper.messageStateMongoRepo, MockHelper.deDuplicationService, MockHelper.tracingHelper));
+        sseTaskFactorySpy = spy(new SseTaskFactory(MockHelper.pulsarConfig, MockHelper.connectionCache, MockHelper.connectionGaugeCache, MockHelper.eventWriter, MockHelper.kafkaPicker, MockHelper.messageStateMongoRepo, MockHelper.deDuplicationService, MockHelper.tracingHelper));
     }
 
     SubscriptionResource createSubscriptionResource() {
-        var subscriptionResource = new SubscriptionResource();
+        var resource = new SubscriptionResource();
 
-        subscriptionResource.getMetadata().setName(MockHelper.TEST_SUBSCRIPTION_ID);
-        subscriptionResource.setSpec(new SubscriptionResourceSpec());
+        var spec = new SubscriptionResourceSpec();
+        var subscription = new Subscription();
+        subscription.setSubscriptionId(MockHelper.TEST_SUBSCRIPTION_ID);
+        spec.setSubscription(subscription);
 
-        return subscriptionResource;
+        resource.setSpec(spec);
+
+        return resource;
     }
 
     @Test
-    void testCreateNew () {
+    void testCreateNew () throws JsonCacheException {
         ArgumentCaptor<SseTask> sseTaskCaptor = ArgumentCaptor.forClass(SseTask.class);
-
-        // First, we provision our KubernetesMockServer with a test Subscription
-        kubernetesClient.resources(SubscriptionResource.class).inNamespace(namespace).create(createSubscriptionResource());
 
         var sseTaskStateContainer = new SseTaskStateContainer();
 
@@ -73,14 +68,7 @@ class SseTaskFactoryTest {
         // Let's verify that connectionGaugeCache.getOrCreateGaugeForSubscription(String environment, String subscriptionId) is called
         verify(MockHelper.connectionGaugeCache, times(1)).getOrCreateGaugeForSubscription(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID);
         // Let's verify that connectionCache.addConnectionForSubscription(String environment, String subscriptionId, SseTask task) is called
-        verify(MockHelper.connectionCache, times(1)).addConnectionForSubscription(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), sseTaskCaptor.capture());
-
-        // We expect that our SubscriptionResource has been modified
-        var resource = kubernetesClient.resources(SubscriptionResource.class)
-                .inNamespace(namespace)
-                .withName(MockHelper.TEST_SUBSCRIPTION_ID).get();
-        assertNotNull(resource);
-        assertEquals("foobar", resource.getSpec().getSseActiveOnPod());
+        verify(MockHelper.connectionCache, times(1)).claimConnectionForSubscription(eq(MockHelper.TEST_SUBSCRIPTION_ID), sseTaskCaptor.capture());
 
         var sseTask = sseTaskCaptor.getValue();
 

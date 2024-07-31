@@ -38,7 +38,7 @@ class SseServiceTest {
     void setupSseServiceTest() {
         MockHelper.init();
 
-        sseService = spy(new SseService(MockHelper.tokenService, sseTaskFactoryMock, MockHelper.subscriptionResourceListener, MockHelper.subscriberCache, MockHelper.pulsarConfig, MockHelper.deDuplicationService));
+        sseService = spy(new SseService(MockHelper.tokenService, sseTaskFactoryMock, MockHelper.subscriberCache, MockHelper.pulsarConfig, MockHelper.deDuplicationService));
     }
 
     @Test
@@ -61,7 +61,7 @@ class SseServiceTest {
         );
         Assertions.assertEquals(String.format("The subscription does not belong to subscriber with id '%s'", MockHelper.TEST_SUBSCRIBER_ID), exception.getMessage());
 
-        Assertions.assertNotEquals(MockHelper.TEST_SUBSCRIBER_ID, MockHelper.subscriberCache.get(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID));
+        Assertions.assertNotEquals(MockHelper.TEST_SUBSCRIBER_ID, MockHelper.subscriberCache.getSubscriberId(MockHelper.TEST_SUBSCRIPTION_ID).orElse(null));
     }
 
     @Test
