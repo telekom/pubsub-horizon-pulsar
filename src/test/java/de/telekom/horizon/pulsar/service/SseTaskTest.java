@@ -98,7 +98,7 @@ class SseTaskTest {
         var emitterMock = mock(ResponseBodyEmitter.class);
         when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
         // We mock the EventMessageSupplier since it's tested in a separate test
-        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, any(StreamLimit.class), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
+        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
         // which is done in the callback of the eventwriter
