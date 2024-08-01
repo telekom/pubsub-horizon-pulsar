@@ -15,6 +15,7 @@ import de.telekom.horizon.pulsar.exception.ConnectionCutOutException;
 import de.telekom.horizon.pulsar.exception.ConnectionTimeoutException;
 import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -97,7 +98,7 @@ class SseTaskTest {
         var emitterMock = mock(ResponseBodyEmitter.class);
         when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
         // We mock the EventMessageSupplier since it's tested in a separate test
-        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
+        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, any(StreamLimit.class), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
         // which is done in the callback of the eventwriter
@@ -178,7 +179,7 @@ class SseTaskTest {
 
         // We mock the EventMessageSupplier and let the mock always answer with a new event message to simulate
         // an endless stream
-        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
+        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, new StreamLimit(), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
         // which is done in the callback of the eventwriter
@@ -231,7 +232,7 @@ class SseTaskTest {
         var emitterMock = mock(ResponseBodyEmitter.class);
         when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
         // We mock the EventMessageSupplier since it's tested in a separate test
-        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
+        when(eventMessageSupplierMock.get()).thenAnswer(i -> new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class)));
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
         // which is done in the callback of the eventwriter

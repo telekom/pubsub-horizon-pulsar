@@ -11,6 +11,7 @@ import com.hazelcast.topic.ITopic;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,7 +122,7 @@ class SseServiceTest {
         var connectionCacheSpy = Mockito.spy(connectionCache);
 
         when(sseTaskFactoryMock.getConnectionCache()).thenReturn(connectionCacheSpy);
-        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false))).thenReturn(sseTaskSpy);
+        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false), any(StreamLimit.class))).thenReturn(sseTaskSpy);
 
         // The mocked task should trigger the termination condition of SseTaskStateContainer.setReady(long timeout) immediately
         // otherwise startEmittingEvents() would run until the timeout is reached, since setReady() is not called asynchronously
@@ -146,7 +147,7 @@ class SseServiceTest {
         }).start();
 
         // PUBLIC METHOD WE WANT TO TEST
-        var responseContainer = sseService.startEmittingEvents(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, false);
+        var responseContainer = sseService.startEmittingEvents(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, false, new StreamLimit());
 
         latch.countDown();
 

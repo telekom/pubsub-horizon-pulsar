@@ -8,6 +8,7 @@ import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,10 +96,10 @@ public class SseService {
      * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
      * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit) {
         var responseContainer = new SseTaskStateContainer();
 
-        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders));
+        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
 

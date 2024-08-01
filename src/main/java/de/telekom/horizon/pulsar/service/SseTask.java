@@ -16,9 +16,11 @@ import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.ConnectionCutOutException;
 import de.telekom.horizon.pulsar.exception.ConnectionTimeoutException;
+import de.telekom.horizon.pulsar.exception.StreamLimitExceededException;
 import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseResponseWrapper;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +30,9 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.web.server.UnsupportedMediaTypeStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -57,7 +61,11 @@ public class SseTask implements Runnable {
     @Setter
     private String contentType = APPLICATION_STREAM_JSON_VALUE;
     private final Stream<EventMessageContext> stream;
+
+    private Instant startTime = Instant.now();
     private Instant lastEventMessage = Instant.now();
+    private long bytesConsumed = 0;
+    private long numberConsumed = 0;
 
     private final AtomicBoolean isCutOut = new AtomicBoolean(false);
     private final AtomicBoolean isEmitterCompleted = new AtomicBoolean(false);
@@ -172,6 +180,19 @@ public class SseTask implements Runnable {
             return false;
         }
 
+        final StreamLimit streamLimit = context.getStreamLimit();
+        if (streamLimit != null) {
+            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed > streamLimit.getMaxNumber();
+            final boolean maxMinutesExceeded = streamLimit.getMaxMinutes() > 0 && startTime.plus(streamLimit.getMaxMinutes(), ChronoUnit.MINUTES).isBefore(Instant.now());
+            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed > streamLimit.getMaxBytes();
+
+            if (maxNumberExceeded || maxMinutesExceeded || maxBytesExceeded) {
+                sseTaskStateContainer.getEmitter().completeWithError(new StreamLimitExceededException());
+                context.finishSpan();
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -258,6 +279,7 @@ public class SseTask implements Runnable {
         try {
             sendEvent(msg, context.getIncludeHttpHeaders());
         } finally {
+
             context.finishSpan();
         }
     }
@@ -277,9 +299,13 @@ public class SseTask implements Runnable {
 
         try {
             var eventJson = serializeEvent(new SseResponseWrapper(msg, includeHttpHeaders));
+
             sseTaskStateContainer.getEmitter().send(eventJson);
 
             pushMetadata(msg, Status.DELIVERED, null);
+
+            bytesConsumed += eventJson.getBytes(StandardCharsets.UTF_8).length;
+            numberConsumed++;
         } catch (JsonProcessingException e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
             log.info(err, e);
