@@ -86,4 +86,20 @@ public class SseController {
 
         return new ResponseEntity<>(responseContainer.getEmitter(), responseHeaders, HttpStatus.OK);
     }
+
+    /**
+     * Stops an active SSE stream for the specified subscriptionId.
+     *
+     * @param environment       The environment path variable.
+     * @param subscriptionId    The subscriptionId path variable.
+     * @throws SubscriberDoesNotMatchSubscriptionException If the subscriber does not match the specified subscription.
+     */
+    @PostMapping(value = "/sse/{subscriptionId}/terminate", produces = {MediaType.ALL_VALUE, APPLICATION_STREAM_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
+    public ResponseEntity<Void> terminateSseStream(@PathVariable String environment, @PathVariable String subscriptionId) throws SubscriberDoesNotMatchSubscriptionException {
+
+        sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
+        sseService.stopEmittingEvents(subscriptionId);
+
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
 }

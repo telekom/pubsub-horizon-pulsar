@@ -4,7 +4,6 @@
 
 package de.telekom.horizon.pulsar.service;
 
-import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
@@ -42,14 +41,12 @@ public class SseService {
      * @param sseTaskFactory                The {@link SseTaskFactory} for creating Server-Sent Event tasks.
      * @param subscriberCache               The {@link SubscriberCache} for caching subscriber information.
      * @param pulsarConfig                  The {@link PulsarConfig} for Pulsar-related configuration.
-     * @param deDuplicationService          The {@link DeDuplicationService} for handling message deduplication.
      */
     @Autowired
     public SseService(TokenService tokenService,
                       SseTaskFactory sseTaskFactory,
                       SubscriberCache subscriberCache,
-                      PulsarConfig pulsarConfig,
-                      DeDuplicationService deDuplicationService) {
+                      PulsarConfig pulsarConfig) {
 
         this.tokenService = tokenService;
         this.sseTaskFactory = sseTaskFactory;
@@ -108,4 +105,12 @@ public class SseService {
         return responseContainer;
     }
 
+    /**
+     * Stops emitting events for an existing active stream.
+     *
+     * @param subscriptionId   The ID of the subscription for which events are being emitted.
+     */
+    public void stopEmittingEvents(String subscriptionId) {
+        sseTaskFactory.getConnectionCache().removeConnectionForSubscription(subscriptionId);
+    }
 }
