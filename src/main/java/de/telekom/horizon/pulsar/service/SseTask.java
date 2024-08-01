@@ -182,9 +182,9 @@ public class SseTask implements Runnable {
 
         final StreamLimit streamLimit = context.getStreamLimit();
         if (streamLimit != null) {
-            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed > streamLimit.getMaxNumber();
+            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed >= streamLimit.getMaxNumber();
             final boolean maxMinutesExceeded = streamLimit.getMaxMinutes() > 0 && startTime.plus(streamLimit.getMaxMinutes(), ChronoUnit.MINUTES).isBefore(Instant.now());
-            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed > streamLimit.getMaxBytes();
+            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed >= streamLimit.getMaxBytes();
 
             if (maxNumberExceeded || maxMinutesExceeded || maxBytesExceeded) {
                 sseTaskStateContainer.getEmitter().completeWithError(new StreamLimitExceededException());
