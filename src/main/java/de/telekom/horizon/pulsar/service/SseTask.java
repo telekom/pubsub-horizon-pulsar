@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 /**
@@ -51,6 +52,9 @@ public class SseTask implements Runnable {
     private static final String TIMEOUT_MESSAGE = "No events received for more than %s ms";
 
     private final SseTaskStateContainer sseTaskStateContainer;
+
+    private final EventMessageSupplier eventMessageSupplier;
+
     @Getter
     private final AtomicInteger openConnectionGaugeValue;
     private final PulsarConfig pulsarConfig;
@@ -60,12 +64,14 @@ public class SseTask implements Runnable {
 
     @Setter
     private String contentType = APPLICATION_STREAM_JSON_VALUE;
-    private final Stream<EventMessageContext> stream;
 
-    private Instant startTime = Instant.now();
+    @Getter
+    private Instant startTime;
+    @Getter
+    private Instant stopTime;
     private Instant lastEventMessage = Instant.now();
-    private long bytesConsumed = 0;
-    private long numberConsumed = 0;
+    private AtomicLong bytesConsumed = new AtomicLong(0);
+    private AtomicLong numberConsumed = new AtomicLong(0);
 
     private final AtomicBoolean isCutOut = new AtomicBoolean(false);
     private final AtomicBoolean isEmitterCompleted = new AtomicBoolean(false);
@@ -86,14 +92,13 @@ public class SseTask implements Runnable {
                    SseTaskFactory factory) {
 
         this.sseTaskStateContainer = sseTaskStateContainer;
+        this.eventMessageSupplier = eventMessageSupplier;
         this.openConnectionGaugeValue = openConnectionGaugeValue;
 
         this.pulsarConfig = factory.getPulsarConfig();
         this.eventWriter = factory.getEventWriter();
         this.deDuplicationService = factory.getDeDuplicationService();
         this.tracingHelper = factory.getTracingHelper();
-
-        this.stream = createStreamTopology(eventMessageSupplier);
     }
 
     /**
@@ -124,6 +129,8 @@ public class SseTask implements Runnable {
      */
     @Override
     public void run() {
+        var stream = createStreamTopology(eventMessageSupplier);
+
         if (sseTaskStateContainer.getCanceled().get()) {
             return;
         }
@@ -131,6 +138,8 @@ public class SseTask implements Runnable {
         // Monitor the status of the emitter completion.
         sseTaskStateContainer.getEmitter().onCompletion(() -> isEmitterCompleted.compareAndExchange(false, true));
         sseTaskStateContainer.getEmitter().onError(e -> isEmitterCompleted.compareAndExchange(false, true));
+
+        startTime = Instant.now();
 
         // Mark the task as running and increment the open connection gauge value.
         sseTaskStateContainer.getRunning().compareAndExchange(false, true);
@@ -144,6 +153,7 @@ public class SseTask implements Runnable {
             sseTaskStateContainer.getEmitter().completeWithError(e);
         } finally {
             openConnectionGaugeValue.getAndSet(0);
+            stopTime = Instant.now();
         }
     }
 
@@ -182,9 +192,9 @@ public class SseTask implements Runnable {
 
         final StreamLimit streamLimit = context.getStreamLimit();
         if (streamLimit != null) {
-            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed >= streamLimit.getMaxNumber();
-            final boolean maxMinutesExceeded = streamLimit.getMaxMinutes() > 0 && startTime.plus(streamLimit.getMaxMinutes(), ChronoUnit.MINUTES).isBefore(Instant.now());
-            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed >= streamLimit.getMaxBytes();
+            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed.get() >= streamLimit.getMaxNumber();
+            final boolean maxMinutesExceeded = streamLimit.getMaxMinutes() > 0 && ChronoUnit.MINUTES.between(startTime, Instant.now()) >= streamLimit.getMaxMinutes();
+            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed.get() >= streamLimit.getMaxBytes();
 
             if (maxNumberExceeded || maxMinutesExceeded || maxBytesExceeded) {
                 sseTaskStateContainer.getEmitter().completeWithError(new StreamLimitExceededException());
@@ -304,8 +314,8 @@ public class SseTask implements Runnable {
 
             pushMetadata(msg, Status.DELIVERED, null);
 
-            bytesConsumed += eventJson.getBytes(StandardCharsets.UTF_8).length;
-            numberConsumed++;
+            bytesConsumed.addAndGet(eventJson.getBytes(StandardCharsets.UTF_8).length);
+            numberConsumed.incrementAndGet();
         } catch (JsonProcessingException e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
             log.info(err, e);
