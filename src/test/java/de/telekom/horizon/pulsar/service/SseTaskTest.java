@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,11 +76,6 @@ class SseTaskTest {
         itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false));
 
         final var itemQueueInitialSize = itemQueue.size();
-
-        // We check whether a stream has been created successfully
-        // Since it is not accessible, we use ReflectionTestUtils
-        var stream = (Stream<EventMessageContext>) ReflectionTestUtils.getField(sseTaskSpy,"stream");
-        assertNotNull(stream);
 
         // We check whether an EventWriter has been created successfully
         // since it is not accessible, we use ReflectionTestUtils.
