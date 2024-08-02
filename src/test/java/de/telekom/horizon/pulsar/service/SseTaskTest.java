@@ -101,7 +101,7 @@ class SseTaskTest {
         when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
         // We mock the EventMessageSupplier since it's tested in a separate test
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
             return new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
@@ -187,7 +187,7 @@ class SseTaskTest {
         // We mock the EventMessageSupplier and let the mock always answer with a new event message to simulate
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
             return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
@@ -239,7 +239,7 @@ class SseTaskTest {
         // We mock the EventMessageSupplier and let the mock always answer with a new event message to simulate
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
             return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
@@ -288,7 +288,7 @@ class SseTaskTest {
         // We mock the EventMessageSupplier and let the mock always answer with a new event message to simulate
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
             return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
@@ -343,7 +343,7 @@ class SseTaskTest {
         // We mock the EventMessageSupplier and let the mock always answer with a new event message to simulate
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
 
             return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
@@ -397,7 +397,7 @@ class SseTaskTest {
         when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
         // We mock the EventMessageSupplier since it's tested in a separate test
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
-            await().pollDelay(10, TimeUnit.MICROSECONDS).untilTrue(new AtomicBoolean(true));
+            await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
             return new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
