@@ -80,7 +80,6 @@ public class SseController {
 
         var responseHeaders = new HttpHeaders();
         responseHeaders.add(HttpHeaders.CONTENT_TYPE, accept);
-        responseHeaders.add(HttpHeaders.TRANSFER_ENCODING, "chunked");
         responseHeaders.add(HttpHeaders.CACHE_CONTROL, "no-cache");
         responseHeaders.add("X-Accel-Buffering", "no");
 
