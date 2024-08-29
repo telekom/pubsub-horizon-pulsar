@@ -10,7 +10,12 @@ import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -40,6 +45,11 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
         workers.addMessageListener(this);
     }
 
+    @PreDestroy
+    public void tearDown() {
+        terminateAllConnections();
+    }
+
     @Override
     public void onMessage(Message<WorkerClaim> workerClaim) {
         var isLocalMember = workerClaim.getPublishingMember().getUuid().compareTo(workerId) == 0;
@@ -66,6 +76,17 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     private void terminateConnection(SseTask task) {
         if (task != null) {
             task.terminate();
+        }
+    }
+
+    /**
+     * Terminates all SSE tasks.
+     */
+    private void terminateAllConnections() {
+        var it = map.entrySet().iterator();
+        while (it.hasNext()) {
+            terminateConnection(it.next().getValue());
+            it.remove();
         }
     }
 

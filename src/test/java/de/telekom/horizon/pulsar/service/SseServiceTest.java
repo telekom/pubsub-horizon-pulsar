@@ -38,7 +38,7 @@ class SseServiceTest {
     void setupSseServiceTest() {
         MockHelper.init();
 
-        sseService = spy(new SseService(MockHelper.tokenService, sseTaskFactoryMock, MockHelper.subscriberCache, MockHelper.pulsarConfig, MockHelper.deDuplicationService));
+        sseService = spy(new SseService(MockHelper.tokenService, sseTaskFactoryMock, MockHelper.subscriberCache, MockHelper.pulsarConfig));
     }
 
     @Test
