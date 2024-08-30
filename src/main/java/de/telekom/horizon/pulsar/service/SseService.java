@@ -4,8 +4,6 @@
 
 package de.telekom.horizon.pulsar.service;
 
-import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
-import de.telekom.horizon.pulsar.cache.ConnectionCache;
 import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
@@ -13,10 +11,6 @@ import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringApplication;
-import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.kafka.event.ContainerStoppedEvent;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 

@@ -10,7 +10,7 @@ spring:
     name: Horizon Pulsar
 
   lifecycle:
-    timeout-per-shutdown-phase: 30s
+    timeout-per-shutdown-phase: 10s
 
 server:
   shutdown: graceful
@@ -26,7 +26,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,heapdump,shutdown
+        include: health,info,prometheus,heapdump,shutdown,horizon-prestop
   endpoint:
     health:
       show-details: always

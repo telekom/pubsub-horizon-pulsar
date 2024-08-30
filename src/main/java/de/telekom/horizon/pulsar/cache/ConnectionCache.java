@@ -10,12 +10,7 @@ import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.SpringApplication;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -43,11 +38,6 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
         this.workerId = hazelcastInstance.getCluster().getLocalMember().getUuid();
         this.workers = hazelcastInstance.getTopic("workers");
         workers.addMessageListener(this);
-    }
-
-    @PreDestroy
-    public void tearDown() {
-        terminateAllConnections();
     }
 
     @Override
@@ -82,7 +72,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     /**
      * Terminates all SSE tasks.
      */
-    private void terminateAllConnections() {
+    public void terminateAllConnections() {
         var it = map.entrySet().iterator();
         while (it.hasNext()) {
             terminateConnection(it.next().getValue());
