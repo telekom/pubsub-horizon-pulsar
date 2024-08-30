@@ -1,25 +1,23 @@
 package de.telekom.horizon.pulsar.actuator;
 
-import de.telekom.horizon.pulsar.cache.ConnectionCache;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component
 @Endpoint(id = "horizon-prestop")
 public class HorizonPreStopActuatorEndpoint {
 
-    private final ConnectionCache connectionCache;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    public HorizonPreStopActuatorEndpoint(ConnectionCache connectionCache) {
-        this.connectionCache = connectionCache;
+    public HorizonPreStopActuatorEndpoint(ApplicationEventPublisher applicationEventPublisher) {
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @WriteOperation
     public void handlePreStop() {
-        log.info("Got PreStop request. Terminating all connections...");
-        connectionCache.terminateAllConnections();
+        var event = new HorizonPreStopEvent(this, "Got PreStop request. Terminating all connections...");
+        applicationEventPublisher.publishEvent(event);
     }
 }

@@ -8,9 +8,11 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
+import de.telekom.horizon.pulsar.actuator.HorizonPreStopEvent;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -89,5 +91,11 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     public void claimConnectionForSubscription(String subscriptionId, SseTask connection) {
         workers.publish(new WorkerClaim(subscriptionId));
         terminateConnection(map.put(subscriptionId, connection));
+    }
+
+    @EventListener
+    public void handleHorizonPreStopEvent(HorizonPreStopEvent event) {
+        log.info(event.getMessage());
+        terminateAllConnections();
     }
 }
