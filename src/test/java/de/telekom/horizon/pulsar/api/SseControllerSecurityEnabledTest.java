@@ -6,6 +6,7 @@ package de.telekom.horizon.pulsar.api;
 
 import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.service.SseService;
 import de.telekom.horizon.pulsar.utils.AbstractIntegrationTest;
 import de.telekom.horizon.pulsar.utils.MongoTestServerConfiguration;
@@ -87,7 +88,7 @@ class SseControllerSecurityEnabledTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         verify(sseService, times(1)).validateSubscriberIdForSubscription(eq(env), eq(subscriptionId));
-        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true));
+        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true), any(StreamLimit.class));
     }
 
     private Jwt getJwt(String subscriberId) {

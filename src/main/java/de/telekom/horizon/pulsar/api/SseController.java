@@ -5,6 +5,7 @@
 package de.telekom.horizon.pulsar.api;
 
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.service.SseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -56,10 +57,13 @@ public class SseController {
     /**
      * Retrieves SSE stream for the specified subscriptionId.
      *
-     * @param environment       The environment path variable.
-     * @param subscriptionId    The subscriptionId path variable.
+     * @param environment        The environment path variable.
+     * @param subscriptionId     The subscriptionId path variable.
      * @param includeHttpHeaders Whether to include HTTP headers in the response.
-     * @param accept            The value of the "Accept" header in the request.
+     * @param maxNumber          Whether to terminate after a certain number of consumed events.
+     * @param maxMinutes         Whether to terminate after a certain time (in minutes).
+     * @param maxBytes           Whether to terminate after a certain number of bytes consumed.
+     * @param accept             The value of the "Accept" header in the request.
      * @return A response containing a {@code ResponseBodyEmitter} for SSE streaming.
      * @throws SubscriberDoesNotMatchSubscriptionException If the subscriber does not match the specified subscription.
      */
@@ -67,6 +71,9 @@ public class SseController {
     public ResponseEntity<ResponseBodyEmitter> getSseStream(@PathVariable String environment,
                                                             @PathVariable String subscriptionId,
                                                             @RequestParam(defaultValue = "false") boolean includeHttpHeaders,
+                                                            @RequestParam(defaultValue = "0") int maxNumber,
+                                                            @RequestParam(defaultValue = "0") int maxMinutes,
+                                                            @RequestParam(defaultValue = "0") int maxBytes,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
@@ -76,7 +83,7 @@ public class SseController {
             accept = APPLICATION_STREAM_JSON_VALUE;
         }
 
-        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, includeHttpHeaders);
+        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, includeHttpHeaders, StreamLimit.of(maxNumber, maxMinutes, maxBytes));
 
         var responseHeaders = new HttpHeaders();
         responseHeaders.add(HttpHeaders.CONTENT_TYPE, accept);
@@ -85,5 +92,21 @@ public class SseController {
         responseHeaders.add("X-Accel-Buffering", "no");
 
         return new ResponseEntity<>(responseContainer.getEmitter(), responseHeaders, HttpStatus.OK);
+    }
+
+    /**
+     * Stops an active SSE stream for the specified subscriptionId.
+     *
+     * @param environment       The environment path variable.
+     * @param subscriptionId    The subscriptionId path variable.
+     * @throws SubscriberDoesNotMatchSubscriptionException If the subscriber does not match the specified subscription.
+     */
+    @PostMapping(value = "/sse/{subscriptionId}/terminate", produces = {MediaType.ALL_VALUE, APPLICATION_STREAM_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
+    public ResponseEntity<Void> terminateSseStream(@PathVariable String environment, @PathVariable String subscriptionId) throws SubscriberDoesNotMatchSubscriptionException {
+
+        sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
+        sseService.stopEmittingEvents(subscriptionId);
+
+        return ResponseEntity.status(HttpStatus.OK).build();
     }
 }

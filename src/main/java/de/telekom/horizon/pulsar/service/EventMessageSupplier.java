@@ -21,6 +21,7 @@ import de.telekom.horizon.pulsar.exception.CouldNotFindEventMessageException;
 import de.telekom.horizon.pulsar.exception.CouldNotPickMessageException;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.EventMessageContext;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     @Getter
     private final String subscriptionId;
     private final Boolean includeHttpHeaders;
+    private final StreamLimit streamLimit;
     private final KafkaPicker kafkaPicker;
     private final EventWriter eventWriter;
     private final MessageStateMongoRepo messageStateMongoRepo;
@@ -69,7 +71,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
      * @param factory           The {@link SseTaskFactory} used for obtaining related components.
      * @param includeHttpHeaders Boolean flag indicating whether to include HTTP headers in the generated {@code EventMessageContext}.
      */
-    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders) {
+    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit) {
         this.subscriptionId = subscriptionId;
 
         this.pulsarConfig = factory.getPulsarConfig();
@@ -78,6 +80,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         this.eventWriter = factory.getEventWriter();
         this.tracingHelper = factory.getTracingHelper();
         this.includeHttpHeaders = includeHttpHeaders;
+        this.streamLimit = streamLimit;
     }
 
     /**
@@ -119,10 +122,10 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                     }
                 }
 
-                return new EventMessageContext(message, includeHttpHeaders, span, spanInScope);
+                return new EventMessageContext(message, includeHttpHeaders, streamLimit, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
                 handleException(state, e);
-                return new EventMessageContext(null, includeHttpHeaders, span, spanInScope);
+                return new EventMessageContext(null, includeHttpHeaders, streamLimit, span, spanInScope);
             } finally {
                 pickSpan.finish();
             }

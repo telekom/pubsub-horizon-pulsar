@@ -4,11 +4,11 @@
 
 package de.telekom.horizon.pulsar.service;
 
-import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,14 +42,12 @@ public class SseService {
      * @param sseTaskFactory                The {@link SseTaskFactory} for creating Server-Sent Event tasks.
      * @param subscriberCache               The {@link SubscriberCache} for caching subscriber information.
      * @param pulsarConfig                  The {@link PulsarConfig} for Pulsar-related configuration.
-     * @param deDuplicationService          The {@link DeDuplicationService} for handling message deduplication.
      */
     @Autowired
     public SseService(TokenService tokenService,
                       SseTaskFactory sseTaskFactory,
                       SubscriberCache subscriberCache,
-                      PulsarConfig pulsarConfig,
-                      DeDuplicationService deDuplicationService) {
+                      PulsarConfig pulsarConfig) {
 
         this.tokenService = tokenService;
         this.sseTaskFactory = sseTaskFactory;
@@ -98,14 +96,22 @@ public class SseService {
      * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
      * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit) {
         var responseContainer = new SseTaskStateContainer();
 
-        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders));
+        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
 
         return responseContainer;
     }
 
+    /**
+     * Stops emitting events for an existing active stream.
+     *
+     * @param subscriptionId   The ID of the subscription for which events are being emitted.
+     */
+    public void stopEmittingEvents(String subscriptionId) {
+        sseTaskFactory.getConnectionCache().removeConnectionForSubscription(subscriptionId);
+    }
 }

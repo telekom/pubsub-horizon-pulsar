@@ -12,6 +12,7 @@ import de.telekom.horizon.pulsar.cache.ConnectionCache;
 import de.telekom.horizon.pulsar.cache.ConnectionGaugeCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
@@ -75,12 +76,13 @@ public class SseTaskFactory {
      * @param environment               The environment associated with the subscription.
      * @param subscriptionId            The ID of the subscription for which the task is created.
      * @param contentType               The content type for the SSE task.
-     * @param sseTaskStateContainer     The {@link SseTaskStateContainer} representing the state of the SSE task.
+     * @param sseTaskStateContainer     The {@link SseTaskStateContainer} represents the state of the SSE task.
      * @param includeHttpHeaders        A boolean flag indicating whether to include HTTP headers in the SSE task.
+     * @param streamLimit               The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
      * @return The newly created {@link SseTask}.
      */
-    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders) {
-        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders);
+    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit) {
+        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, streamLimit);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);
