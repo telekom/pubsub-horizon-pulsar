@@ -7,7 +7,6 @@ package de.telekom.horizon.pulsar.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
-import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.eni.pandora.horizon.model.event.DeliveryType;
 import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
@@ -26,7 +25,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
@@ -36,15 +34,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import static de.telekom.horizon.pulsar.testutils.MockHelper.metricsHelper;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @Slf4j
 class EventMessageSupplierTest {
-
-    @MockBean
-    HorizonMetricsHelper metricsHelper;
 
     EventMessageSupplier eventMessageSupplier;
 
@@ -93,18 +89,15 @@ class EventMessageSupplierTest {
 
         var counterMock = Mockito.mock(Counter.class);
         var registryMock = Mockito.mock(MeterRegistry.class);
-
-        doNothing().when(counterMock).increment();
         when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
         // We do multiple calls to EventMessageSupplier.get() in order to test
         // that each call will fetch the next event message in the queue
         for (int i = 0; i < polls; i++) {
             // We mock the actual picking of a message from Kafka here
             when(MockHelper.kafkaTemplate.receive(eq(MockHelper.TEST_TOPIC), eq(states.get(i).getCoordinates().partition()), eq(states.get(i).getCoordinates().offset()), eq(Duration.ofMillis(30000)))).thenReturn(record);
-
-            when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
-            when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
             // PUBLIC METHOD WE WANT TO TEST
             var result = eventMessageSupplier.get();

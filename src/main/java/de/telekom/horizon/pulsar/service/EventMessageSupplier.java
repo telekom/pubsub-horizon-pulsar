@@ -128,7 +128,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                 }
 
                 metricsHelper.getRegistry().counter(METRIC_SENT_SSE_EVENTS, metricsHelper.buildTagsFromSubscriptionEventMessage(message)).increment();
-                span.annotate("export metrics");
 
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
