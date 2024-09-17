@@ -34,7 +34,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
-import static de.telekom.horizon.pulsar.testutils.MockHelper.metricsHelper;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -86,12 +85,6 @@ class EventMessageSupplierTest {
         // Since we want to check invocations with it, we will overwrite the EventWriter in EventMessageSupplier via reflections
         var eventWriterMock = mock(EventWriter.class);
         ReflectionTestUtils.setField(eventMessageSupplier, "eventWriter", eventWriterMock, EventWriter.class);
-
-        var counterMock = Mockito.mock(Counter.class);
-        var registryMock = Mockito.mock(MeterRegistry.class);
-        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
-        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
-        when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
         // We do multiple calls to EventMessageSupplier.get() in order to test
         // that each call will fetch the next event message in the queue

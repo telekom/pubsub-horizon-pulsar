@@ -63,7 +63,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     private final EventWriter eventWriter;
     private final MessageStateMongoRepo messageStateMongoRepo;
     private final HorizonTracer tracingHelper;
-    private final HorizonMetricsHelper metricsHelper;
     private final ConcurrentLinkedQueue<State> messageStates = new ConcurrentLinkedQueue<>();
     private Instant lastPoll;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -82,7 +81,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         this.messageStateMongoRepo = factory.getMessageStateMongoRepo();
         this.kafkaPicker = factory.getKafkaPicker();
         this.eventWriter = factory.getEventWriter();
-        this.metricsHelper = factory.getMetricsHelper();
         this.tracingHelper = factory.getTracingHelper();
         this.includeHttpHeaders = includeHttpHeaders;
         this.streamLimit = streamLimit;
@@ -126,8 +124,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
                 }
-
-                metricsHelper.getRegistry().counter(METRIC_SENT_SSE_EVENTS, metricsHelper.buildTagsFromSubscriptionEventMessage(message)).increment();
 
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {

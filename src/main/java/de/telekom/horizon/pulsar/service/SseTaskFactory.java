@@ -69,7 +69,6 @@ public class SseTaskFactory {
         this.tracingHelper = tracingHelper;
         this.connectionCache = connectionCache;
         this.deDuplicationService = deDuplicationService;
-
         this.eventWriter = eventWriter;
         this.metricsHelper = metricsHelper;
     }
