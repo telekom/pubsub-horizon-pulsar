@@ -87,6 +87,7 @@ public class MockHelper {
         subscriberCache = mock(SubscriberCache.class);
         pulsarConfig = mock(PulsarConfig.class);
         messageStateMongoRepo = mock(MessageStateMongoRepo.class);
+        metricsHelper = mock(HorizonMetricsHelper.class);
         tracingHelper = mock(HorizonTracer.class);
         environment = mock(Environment.class);
         emitter = mock(ResponseBodyEmitter.class);
