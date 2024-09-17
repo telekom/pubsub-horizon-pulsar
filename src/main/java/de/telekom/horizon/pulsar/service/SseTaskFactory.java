@@ -6,6 +6,7 @@ package de.telekom.horizon.pulsar.service;
 
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
+import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
@@ -36,6 +37,7 @@ public class SseTaskFactory {
     private final DeDuplicationService deDuplicationService;
     private final HorizonTracer tracingHelper;
     private final EventWriter eventWriter;
+    private final HorizonMetricsHelper metricsHelper;
 
     /**
      * Constructs an instance of {@code SseTaskFactory}.
@@ -57,6 +59,7 @@ public class SseTaskFactory {
             KafkaPicker kafkaPicker,
             MessageStateMongoRepo messageStateMongoRepo,
             DeDuplicationService deDuplicationService,
+            HorizonMetricsHelper metricsHelper,
             HorizonTracer tracingHelper) {
 
         this.pulsarConfig = pulsarConfig;
@@ -68,6 +71,7 @@ public class SseTaskFactory {
         this.deDuplicationService = deDuplicationService;
 
         this.eventWriter = eventWriter;
+        this.metricsHelper = metricsHelper;
     }
 
     /**
