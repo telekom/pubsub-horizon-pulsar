@@ -18,6 +18,9 @@ import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +42,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static de.telekom.horizon.pulsar.testutils.MockHelper.metricsHelper;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -59,7 +63,6 @@ class SseTaskTest {
         MockHelper.init();
 
         var sseTask = new SseTask(sseTaskStateContainerMock, eventMessageSupplierMock, MockHelper.openConnectionGaugeValue, MockHelper.sseTaskFactory);
-
         sseTaskSpy = spy(sseTask);
     }
 
@@ -107,6 +110,12 @@ class SseTaskTest {
 
         // Used for verifying the timout worked
         var started = Instant.now();
+
+        var counterMock = Mockito.mock(Counter.class);
+        var registryMock = Mockito.mock(MeterRegistry.class);
+        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
         // PUBLIC METHOD WE WANT TO TEST
         sseTaskSpy.run();
@@ -191,6 +200,12 @@ class SseTaskTest {
         var succeededFuture = CompletableFuture.completedFuture(sendResult);
         when(eventWriterMock.send(anyString(), notNull(), any())).thenReturn(succeededFuture);
 
+        var counterMock = Mockito.mock(Counter.class);
+        var registryMock = Mockito.mock(MeterRegistry.class);
+        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
+
         sseTaskSpy.run();
 
         var reachedZero = latch.await(10000, TimeUnit.MILLISECONDS);
@@ -243,6 +258,12 @@ class SseTaskTest {
         var succeededFuture = CompletableFuture.completedFuture(sendResult);
         when(eventWriterMock.send(anyString(), notNull(), any())).thenReturn(succeededFuture);
 
+        var counterMock = Mockito.mock(Counter.class);
+        var registryMock = Mockito.mock(MeterRegistry.class);
+        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
+
         sseTaskSpy.run();
 
         verify(emitterMock, times(maxNumberLimit)).send(anyString());
@@ -291,6 +312,12 @@ class SseTaskTest {
         SendResult<String, String> sendResult = mock(SendResult.class);
         var succeededFuture = CompletableFuture.completedFuture(sendResult);
         when(eventWriterMock.send(anyString(), notNull(), any())).thenReturn(succeededFuture);
+
+        var counterMock = Mockito.mock(Counter.class);
+        var registryMock = Mockito.mock(MeterRegistry.class);
+        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
         sseTaskSpy.run();
 
@@ -347,6 +374,12 @@ class SseTaskTest {
         SendResult<String, String> sendResult = mock(SendResult.class);
         var succeededFuture = CompletableFuture.completedFuture(sendResult);
         when(eventWriterMock.send(anyString(), notNull(), any())).thenReturn(succeededFuture);
+
+        var counterMock = Mockito.mock(Counter.class);
+        var registryMock = Mockito.mock(MeterRegistry.class);
+        when(registryMock.counter(any(), any(Tags.class))).thenReturn(counterMock);
+        when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
+        when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
         sseTaskSpy.run();
 

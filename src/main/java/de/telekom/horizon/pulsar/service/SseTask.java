@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
+import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
@@ -40,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
+import static de.telekom.eni.pandora.horizon.metrics.HorizonMetricsConstants.METRIC_SENT_SSE_EVENTS;
+
 /**
  * Represents a Server-Sent Events (SSE) task responsible for emitting events to clients.
  *
@@ -61,6 +64,7 @@ public class SseTask implements Runnable {
     private final EventWriter eventWriter;
     private final DeDuplicationService deDuplicationService;
     private final HorizonTracer tracingHelper;
+    private final HorizonMetricsHelper metricsHelper;
 
     @Setter
     private String contentType = APPLICATION_STREAM_JSON_VALUE;
@@ -99,6 +103,7 @@ public class SseTask implements Runnable {
         this.eventWriter = factory.getEventWriter();
         this.deDuplicationService = factory.getDeDuplicationService();
         this.tracingHelper = factory.getTracingHelper();
+        this.metricsHelper = factory.getMetricsHelper();
     }
 
     /**
@@ -316,6 +321,8 @@ public class SseTask implements Runnable {
 
             bytesConsumed.addAndGet(eventJson.getBytes(StandardCharsets.UTF_8).length);
             numberConsumed.incrementAndGet();
+
+            metricsHelper.getRegistry().counter(METRIC_SENT_SSE_EVENTS, metricsHelper.buildTagsFromSubscriptionEventMessage(msg)).increment();
         } catch (JsonProcessingException e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
             log.info(err, e);

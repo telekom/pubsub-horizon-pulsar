@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.config.KafkaProperties;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
+import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.eni.pandora.horizon.model.db.Coordinates;
 import de.telekom.eni.pandora.horizon.model.db.PartialEvent;
 import de.telekom.eni.pandora.horizon.model.db.State;
@@ -62,6 +63,7 @@ public class MockHelper {
     public static Environment environment;
     public static ResponseBodyEmitter emitter;
     public static TokenService tokenService;
+    public static HorizonMetricsHelper metricsHelper;
 
     public static DeDuplicationService deDuplicationService;
 
@@ -85,6 +87,7 @@ public class MockHelper {
         subscriberCache = mock(SubscriberCache.class);
         pulsarConfig = mock(PulsarConfig.class);
         messageStateMongoRepo = mock(MessageStateMongoRepo.class);
+        metricsHelper = mock(HorizonMetricsHelper.class);
         tracingHelper = mock(HorizonTracer.class);
         environment = mock(Environment.class);
         emitter = mock(ResponseBodyEmitter.class);
@@ -99,7 +102,7 @@ public class MockHelper {
         lenient().when(pulsarConfig.getQueueCapacity()).thenReturn(100);
 
         kafkaPicker = new KafkaPicker(kafkaTemplate);
-        sseTaskFactory = new SseTaskFactory(pulsarConfig, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, tracingHelper);
+        sseTaskFactory = new SseTaskFactory(pulsarConfig, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, metricsHelper, tracingHelper);
     }
 
     public static SubscriptionEventMessage createSubscriptionEventMessageForTesting(DeliveryType deliveryType, boolean withAdditionalFields) {

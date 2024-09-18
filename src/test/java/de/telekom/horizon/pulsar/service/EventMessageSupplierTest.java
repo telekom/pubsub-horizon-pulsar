@@ -12,6 +12,9 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,7 +85,6 @@ class EventMessageSupplierTest {
         // Since we want to check invocations with it, we will overwrite the EventWriter in EventMessageSupplier via reflections
         var eventWriterMock = mock(EventWriter.class);
         ReflectionTestUtils.setField(eventMessageSupplier, "eventWriter", eventWriterMock, EventWriter.class);
-
 
         // We do multiple calls to EventMessageSupplier.get() in order to test
         // that each call will fetch the next event message in the queue
