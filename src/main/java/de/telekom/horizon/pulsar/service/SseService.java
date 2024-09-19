@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+
 
 /**
  * Service class for handling Server-Sent Events (SSE).
@@ -96,10 +98,10 @@ public class SseService {
      * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
      * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
         var responseContainer = new SseTaskStateContainer();
 
-        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit));
+        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit, redeliveryFrom, redeliveryTo));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
 

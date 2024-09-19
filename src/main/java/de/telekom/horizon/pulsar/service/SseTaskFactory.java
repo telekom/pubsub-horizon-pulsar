@@ -18,6 +18,8 @@ import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+
 /**
  * Factory class for creating Server-Sent Event (SSE) tasks.
  *
@@ -84,8 +86,8 @@ public class SseTaskFactory {
      * @param streamLimit               The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
      * @return The newly created {@link SseTask}.
      */
-    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit) {
-        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, streamLimit);
+    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
+        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, streamLimit, redeliveryFrom, redeliveryTo);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);

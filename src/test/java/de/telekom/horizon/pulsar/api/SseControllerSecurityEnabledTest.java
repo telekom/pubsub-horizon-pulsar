@@ -22,6 +22,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -88,7 +89,7 @@ class SseControllerSecurityEnabledTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         verify(sseService, times(1)).validateSubscriberIdForSubscription(eq(env), eq(subscriptionId));
-        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true), any(StreamLimit.class));
+        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true), any(StreamLimit.class), nullable(Instant.class), nullable(Instant.class));
     }
 
     private Jwt getJwt(String subscriberId) {

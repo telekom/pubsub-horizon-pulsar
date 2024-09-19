@@ -14,6 +14,7 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
 import de.telekom.eni.pandora.horizon.model.meta.EventRetentionTime;
+import de.telekom.eni.pandora.horizon.mongo.model.MessageStateMongoDocument;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,8 +63,11 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     private final MessageStateMongoRepo messageStateMongoRepo;
     private final HorizonTracer tracingHelper;
     private final ConcurrentLinkedQueue<State> messageStates = new ConcurrentLinkedQueue<>();
-    private Instant lastPoll;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Instant redeliveryFrom;
+    private final Instant redeliveryTo;
+
+    private Instant lastPoll;
 
     /**
      * Constructs an instance of {@code EventMessageSupplier}.
@@ -71,7 +76,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
      * @param factory           The {@link SseTaskFactory} used for obtaining related components.
      * @param includeHttpHeaders Boolean flag indicating whether to include HTTP headers in the generated {@code EventMessageContext}.
      */
-    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit) {
+    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
         this.subscriptionId = subscriptionId;
 
         this.pulsarConfig = factory.getPulsarConfig();
@@ -81,6 +86,8 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         this.tracingHelper = factory.getTracingHelper();
         this.includeHttpHeaders = includeHttpHeaders;
         this.streamLimit = streamLimit;
+        this.redeliveryFrom = redeliveryFrom;
+        this.redeliveryTo = redeliveryTo;
     }
 
     /**
@@ -170,8 +177,24 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
             delay();
 
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
+            List <MessageStateMongoDocument> events = new ArrayList<>();
 
-            var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+            if (redeliveryFrom != null && redeliveryTo != null) {
+                var deliveredEvents = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAndTimestampBetweenAsc(
+                        List.of(Status.DELIVERED),
+                        DeliveryType.SERVER_SENT_EVENT,
+                        subscriptionId,
+                        redeliveryFrom,
+                        redeliveryTo,
+                        pageable
+                ).stream()
+                        .filter(m -> m.getCoordinates() != null)
+                        .toList();
+
+                events.addAll(deliveredEvents);
+            }
+
+            var processedEvents = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
                     List.of(Status.PROCESSED),
                     DeliveryType.SERVER_SENT_EVENT,
                     subscriptionId,
@@ -180,7 +203,8 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                     .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
                     .toList();
 
-            messageStates.addAll(list);
+            events.addAll(processedEvents);
+            messageStates.addAll(events);
 
             lastPoll = Instant.now();
         }
