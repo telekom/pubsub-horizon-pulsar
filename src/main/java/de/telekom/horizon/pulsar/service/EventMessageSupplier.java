@@ -191,6 +191,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         .filter(m -> m.getCoordinates() != null)
                         .toList();
 
+                log.warn("Delivered events: {}", deliveredEvents.size());
                 events.addAll(deliveredEvents);
             }
 
@@ -204,6 +205,8 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                     .toList();
 
             events.addAll(processedEvents);
+
+            log.warn("Events: {}", events.size());
             messageStates.addAll(events);
 
             lastPoll = Instant.now();
