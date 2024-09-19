@@ -180,6 +180,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
             List <MessageStateMongoDocument> events = new ArrayList<>();
 
             if (redeliveryFrom != null && redeliveryTo != null) {
+                log.warn("Redelivery from: {}, Redelivery to: {}", redeliveryFrom, redeliveryTo);
                 var deliveredEvents = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAndTimestampBetweenAsc(
                         List.of(Status.DELIVERED),
                         DeliveryType.SERVER_SENT_EVENT,
@@ -191,7 +192,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         .filter(m -> m.getCoordinates() != null)
                         .toList();
 
-                log.warn("Delivered events: {}", deliveredEvents.size());
                 events.addAll(deliveredEvents);
             }
 
@@ -206,7 +206,6 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
             events.addAll(processedEvents);
 
-            log.warn("Events: {}", events.size());
             messageStates.addAll(events);
 
             lastPoll = Instant.now();
