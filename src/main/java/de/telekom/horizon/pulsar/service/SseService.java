@@ -16,6 +16,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Date;
 
 
 /**
@@ -98,7 +99,7 @@ public class SseService {
      * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
      * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit, Date redeliveryFrom, Date redeliveryTo) {
         var responseContainer = new SseTaskStateContainer();
 
         taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit, redeliveryFrom, redeliveryTo));

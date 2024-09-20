@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Date;
 
 /**
  * Factory class for creating Server-Sent Event (SSE) tasks.
@@ -86,7 +87,7 @@ public class SseTaskFactory {
      * @param streamLimit               The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
      * @return The newly created {@link SseTask}.
      */
-    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
+    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit, Date redeliveryFrom, Date redeliveryTo) {
         var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, streamLimit, redeliveryFrom, redeliveryTo);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 

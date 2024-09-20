@@ -25,6 +25,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -123,7 +124,7 @@ class SseServiceTest {
         var connectionCacheSpy = Mockito.spy(connectionCache);
 
         when(sseTaskFactoryMock.getConnectionCache()).thenReturn(connectionCacheSpy);
-        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false), any(StreamLimit.class), nullable(Instant.class), nullable(Instant.class))).thenReturn(sseTaskSpy);
+        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false), any(StreamLimit.class), nullable(Date.class), nullable(Date.class))).thenReturn(sseTaskSpy);
 
         // The mocked task should trigger the termination condition of SseTaskStateContainer.setReady(long timeout) immediately
         // otherwise startEmittingEvents() would run until the timeout is reached, since setReady() is not called asynchronously

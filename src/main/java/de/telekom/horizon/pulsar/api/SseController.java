@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import java.time.Instant;
+import java.util.Date;
 import java.util.Objects;
 
 /**
@@ -74,8 +75,8 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxNumber,
                                                             @RequestParam(defaultValue = "0") int maxMinutes,
                                                             @RequestParam(defaultValue = "0") int maxBytes,
-                                                            @RequestParam(required = false) Instant redeliveryFrom,
-                                                            @RequestParam(required = false) Instant redeliveryTo,
+                                                            @RequestParam(required = false) Date redeliveryFrom,
+                                                            @RequestParam(required = false) Date redeliveryTo,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);

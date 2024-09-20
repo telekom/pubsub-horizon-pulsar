@@ -33,10 +33,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
@@ -64,8 +61,8 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     private final HorizonTracer tracingHelper;
     private final ConcurrentLinkedQueue<State> messageStates = new ConcurrentLinkedQueue<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Instant redeliveryFrom;
-    private final Instant redeliveryTo;
+    private final Date redeliveryFrom;
+    private final Date redeliveryTo;
 
     private Instant lastPoll;
 
@@ -76,7 +73,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
      * @param factory           The {@link SseTaskFactory} used for obtaining related components.
      * @param includeHttpHeaders Boolean flag indicating whether to include HTTP headers in the generated {@code EventMessageContext}.
      */
-    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit, Instant redeliveryFrom, Instant redeliveryTo) {
+    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit, Date redeliveryFrom, Date redeliveryTo) {
         this.subscriptionId = subscriptionId;
 
         this.pulsarConfig = factory.getPulsarConfig();
@@ -191,7 +188,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                 ).stream()
                         .filter(m -> m.getCoordinates() != null)
                         .toList();
-
+                log.warn("Delivered events: {}", deliveredEvents.size());
                 events.addAll(deliveredEvents);
             }
 
