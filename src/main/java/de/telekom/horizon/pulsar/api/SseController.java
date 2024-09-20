@@ -8,6 +8,7 @@ import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionExc
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.service.SseService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -75,8 +76,8 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxNumber,
                                                             @RequestParam(defaultValue = "0") int maxMinutes,
                                                             @RequestParam(defaultValue = "0") int maxBytes,
-                                                            @RequestParam(required = false) Date redeliveryFrom,
-                                                            @RequestParam(required = false) Date redeliveryTo,
+                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date redeliveryFrom,
+                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date redeliveryTo,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
