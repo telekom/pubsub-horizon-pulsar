@@ -126,8 +126,11 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         var errorMessage = String.format("Event message %s did not match subscriptionId %s", state.getUuid(), state.getSubscriptionId());
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
-                }
 
+                    if (currentOffset != null) {
+                        Optional.ofNullable(message.getHttpHeaders()).ifPresent(x -> x.put("x-pubsub-offset-id", List.of(currentOffset)));
+                    }
+                }
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
                 handleException(state, e);
