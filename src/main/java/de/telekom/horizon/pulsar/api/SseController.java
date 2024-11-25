@@ -74,7 +74,7 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxNumber,
                                                             @RequestParam(defaultValue = "0") int maxMinutes,
                                                             @RequestParam(defaultValue = "0") int maxBytes,
-                                                            @RequestParam String offset,
+                                                            @RequestHeader(value = "Last-Event-ID", required = false) String offset,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
