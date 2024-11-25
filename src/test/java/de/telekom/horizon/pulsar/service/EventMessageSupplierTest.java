@@ -44,7 +44,7 @@ class EventMessageSupplierTest {
     void setupEventMessageSupplierTest() {
         MockHelper.init();
 
-        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, anyString(), new StreamLimit());
+        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, null, new StreamLimit());
     }
 
     @ParameterizedTest
