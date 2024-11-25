@@ -84,7 +84,7 @@ public class SseController {
             accept = APPLICATION_STREAM_JSON_VALUE;
         }
 
-        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, includeHttpHeaders, offset, StreamLimit.of(maxNumber, maxMinutes, maxBytes));
+        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, offset != null || includeHttpHeaders, offset, StreamLimit.of(maxNumber, maxMinutes, maxBytes));
 
         var responseHeaders = new HttpHeaders();
         responseHeaders.add(HttpHeaders.CONTENT_TYPE, accept);

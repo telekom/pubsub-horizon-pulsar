@@ -127,9 +127,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
 
-                    if (currentOffset != null) {
-                        Optional.ofNullable(message.getHttpHeaders()).ifPresent(x -> x.put("x-pubsub-offset-id", List.of(currentOffset)));
-                    }
+                    Optional.ofNullable(message.getHttpHeaders()).ifPresent(x -> x.put("x-pubsub-offset-id", List.of(currentOffset)));
                 }
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
