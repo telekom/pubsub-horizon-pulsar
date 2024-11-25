@@ -81,11 +81,12 @@ public class SseTaskFactory {
      * @param contentType               The content type for the SSE task.
      * @param sseTaskStateContainer     The {@link SseTaskStateContainer} represents the state of the SSE task.
      * @param includeHttpHeaders        A boolean flag indicating whether to include HTTP headers in the SSE task.
+     * @param offset                    Enables offset based streaming. Specifies the offset (message id) of the last received event message.
      * @param streamLimit               The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
-     * @return The newly created {@link SseTask}.
+     * @return                          The newly created {@link SseTask}.
      */
-    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, StreamLimit streamLimit) {
-        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, streamLimit);
+    public SseTask createNew(String environment, String subscriptionId, String contentType, SseTaskStateContainer sseTaskStateContainer, boolean includeHttpHeaders, String offset, StreamLimit streamLimit) {
+        var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, offset, streamLimit);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);

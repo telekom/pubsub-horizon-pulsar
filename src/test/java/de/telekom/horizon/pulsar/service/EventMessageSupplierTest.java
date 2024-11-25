@@ -12,9 +12,6 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +44,7 @@ class EventMessageSupplierTest {
     void setupEventMessageSupplierTest() {
         MockHelper.init();
 
-        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, new StreamLimit());
+        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, anyString(), new StreamLimit());
     }
 
     @ParameterizedTest

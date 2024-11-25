@@ -74,6 +74,7 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxNumber,
                                                             @RequestParam(defaultValue = "0") int maxMinutes,
                                                             @RequestParam(defaultValue = "0") int maxBytes,
+                                                            @RequestParam String offset,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
@@ -83,7 +84,7 @@ public class SseController {
             accept = APPLICATION_STREAM_JSON_VALUE;
         }
 
-        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, includeHttpHeaders, StreamLimit.of(maxNumber, maxMinutes, maxBytes));
+        var responseContainer = sseService.startEmittingEvents(environment, subscriptionId, accept, includeHttpHeaders, offset, StreamLimit.of(maxNumber, maxMinutes, maxBytes));
 
         var responseHeaders = new HttpHeaders();
         responseHeaders.add(HttpHeaders.CONTENT_TYPE, accept);

@@ -90,16 +90,18 @@ public class SseService {
     /**
      * Starts emitting events for the specified subscription.
      *
-     * @param environment      The environment associated with the subscription.
-     * @param subscriptionId   The ID of the subscription for which events should be emitted.
-     * @param contentType      The content type for the events.
-     * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
-     * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
+     * @param environment         The environment associated with the subscription.
+     * @param subscriptionId      The ID of the subscription for which events should be emitted.
+     * @param contentType         The content type for the events.
+     * @param includeHttpHeaders  A boolean flag indicating whether to include HTTP headers in the emitted events.
+     * @param offset              Enables offset based streaming. Specifies the offset (message id) of the last received event message.
+     * @param streamLimit         The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
+     * @return                    The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, StreamLimit streamLimit) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, String offset, StreamLimit streamLimit) {
         var responseContainer = new SseTaskStateContainer();
 
-        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, streamLimit));
+        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, offset, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
 

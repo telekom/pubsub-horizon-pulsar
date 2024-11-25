@@ -30,6 +30,8 @@ public class EventMessageContext {
     private Boolean includeHttpHeaders;
     @Getter
     private StreamLimit streamLimit;
+    @Getter
+    private boolean ignoreDeduplication;
 
     private Span span;
     private Tracer.SpanInScope spanInScope;

@@ -277,18 +277,20 @@ public class SseTask implements Runnable {
             return;
         }
 
-        String msgUuidOrNull = deDuplicationService.get(msg);
-        boolean isDuplicate = Objects.nonNull(msgUuidOrNull);
-        if (isDuplicate) {
-            if(Objects.equals(msg.getUuid(), msgUuidOrNull)) {
-                log.debug("Message with id {} was found in the deduplication cache with the same UUID. Message will be ignored, because status will probably set to DELIVERED in the next minutes.", msg.getUuid());
-            } else {
-                log.debug("Message with id {} was found in the deduplication cache with another UUID. Message will be set to DUPLICATE to prevent event being stuck at PROCESSED.", msg.getUuid());
-                pushMetadata(msg, Status.DUPLICATE, null);
-            }
+        if (!context.isIgnoreDeduplication()) {
+            String msgUuidOrNull = deDuplicationService.get(msg);
+            boolean isDuplicate = Objects.nonNull(msgUuidOrNull);
+            if (isDuplicate) {
+                if(Objects.equals(msg.getUuid(), msgUuidOrNull)) {
+                    log.debug("Message with id {} was found in the deduplication cache with the same UUID. Message will be ignored, because status will probably set to DELIVERED in the next minutes.", msg.getUuid());
+                } else {
+                    log.debug("Message with id {} was found in the deduplication cache with another UUID. Message will be set to DUPLICATE to prevent event being stuck at PROCESSED.", msg.getUuid());
+                    pushMetadata(msg, Status.DUPLICATE, null);
+                }
 
-            context.finishSpan();
-            return;
+                context.finishSpan();
+                return;
+            }
         }
 
         try {
