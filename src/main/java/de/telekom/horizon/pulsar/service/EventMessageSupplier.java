@@ -34,10 +34,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
@@ -105,7 +102,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
         if (!messageStates.isEmpty()) {
             var state = messageStates.poll();
-            var ignoreDeduplication = StringUtils.isEmpty(currentOffset);
+            var ignoreDeduplication = StringUtils.isNotEmpty(currentOffset);
 
             // TODO: these spans get duplicated cause of the vortex latency - will be resolved DHEI-13764
 
@@ -181,17 +178,23 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
 
             if (StringUtils.isNoneEmpty(currentOffset)) {
-                var list = messageStateMongoRepo.findByDeliveryTypeAndAfterObjectIdAsc(
-                                new ObjectId(currentOffset),
-                                DeliveryType.SERVER_SENT_EVENT,
-                                pageable
-                        ).stream()
-                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
-                        .toList();
+                var offsetMsg = messageStateMongoRepo.findById(currentOffset);
+                if (offsetMsg.isPresent()) {
+                    var offsetTimestamp = offsetMsg.get().getTimestamp();
 
-                messageStates.addAll(list);
+                    var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionAndTimestampGreaterThanAsc(
+                                    DeliveryType.SERVER_SENT_EVENT,
+                                    subscriptionId,
+                                    offsetTimestamp,
+                                    pageable
+                            ).stream()
+                            .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
+                            .toList();
 
-                currentOffset = list.getLast().getUuid();
+                    messageStates.addAll(list);
+
+                    currentOffset = list.getLast().getUuid();
+                }
             } else {
                 var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
                                 List.of(Status.PROCESSED),
