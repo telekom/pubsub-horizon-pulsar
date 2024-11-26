@@ -182,7 +182,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                 if (offsetMsg.isPresent()) {
                     var offsetTimestamp = offsetMsg.get().getTimestamp();
 
-                    var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionAndTimestampGreaterThanAsc(
+                    var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
                                     DeliveryType.SERVER_SENT_EVENT,
                                     subscriptionId,
                                     offsetTimestamp,
@@ -193,7 +193,9 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
                     messageStates.addAll(list);
 
-                    currentOffset = list.getLast().getUuid();
+                    if (!list.isEmpty()) {
+                        currentOffset = list.getLast().getUuid();
+                    }
                 }
             } else {
                 var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
