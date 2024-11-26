@@ -25,6 +25,7 @@ import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.PageRequest;
@@ -103,7 +104,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
         if (!messageStates.isEmpty()) {
             var state = messageStates.poll();
-            var ignoreDeduplication = currentOffset != null && Status.DELIVERED == state.getStatus();
+            var ignoreDeduplication = StringUtils.isEmpty(currentOffset);
 
             // TODO: these spans get duplicated cause of the vortex latency - will be resolved DHEI-13764
 
@@ -178,7 +179,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
 
-            if (currentOffset != null) {
+            if (StringUtils.isNoneEmpty(currentOffset)) {
                 var list = messageStateMongoRepo.findByDeliveryTypeAndAfterObjectIdAsc(
                                 new ObjectId(currentOffset),
                                 DeliveryType.SERVER_SENT_EVENT,
