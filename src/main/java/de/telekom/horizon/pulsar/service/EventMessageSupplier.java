@@ -34,6 +34,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -128,7 +129,9 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
 
-                    Optional.ofNullable(message.getHttpHeaders()).ifPresent(x -> x.put("x-pubsub-offset-id", List.of(currentOffset)));
+                    if (StringUtils.isNoneEmpty()) {
+                        Optional.ofNullable(message.getHttpHeaders()).ifPresent(headers -> headers.put("x-pubsub-offset-id", new ArrayList<>(List.of(currentOffset))));
+                    }
                 }
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
