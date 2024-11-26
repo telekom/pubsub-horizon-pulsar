@@ -129,7 +129,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
 
-                    if (StringUtils.isNoneEmpty()) {
+                    if (StringUtils.isNotEmpty(currentOffset)) {
                         Optional.ofNullable(message.getHttpHeaders()).ifPresent(headers -> headers.put("x-pubsub-offset-id", new ArrayList<>(List.of(currentOffset))));
                     }
                 }
