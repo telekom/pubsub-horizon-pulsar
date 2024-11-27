@@ -67,7 +67,7 @@ class SseTaskTest {
     }
 
     @Test
-    void testRun() throws IOException, InterruptedException {
+    void testRun() throws IOException {
         final var o = new ObjectMapper();
         // For this test we set the timeout to 10s to simulate the automatic timeout if there are no new events flowing
         final var timeout = 10000L;
@@ -75,8 +75,8 @@ class SseTaskTest {
 
         // We create a new SubscriptionEventMessage queue and add some test messages
         var itemQueue = new ConcurrentLinkedQueue<SubscriptionEventMessage>();
-        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false));
-        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false));
+        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
+        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
 
         final var itemQueueInitialSize = itemQueue.size();
 
@@ -191,7 +191,7 @@ class SseTaskTest {
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
             await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
-            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
+            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
@@ -249,7 +249,7 @@ class SseTaskTest {
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
             await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
-            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
+            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
@@ -304,7 +304,7 @@ class SseTaskTest {
         // an endless stream
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
             await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
-            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
+            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
@@ -366,7 +366,7 @@ class SseTaskTest {
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
             await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
 
-            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
+            return new EventMessageContext(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT), false, streamLimit, false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
@@ -397,8 +397,8 @@ class SseTaskTest {
     void testSendEventFailed() throws IOException {
         // We create a new SubscriptionEventMessage queue and add some test messages
         var itemQueue = new ConcurrentLinkedQueue<SubscriptionEventMessage>();
-        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false));
-        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT, false));
+        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
+        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
 
         final var itemQueueInitialSize = itemQueue.size();
 
