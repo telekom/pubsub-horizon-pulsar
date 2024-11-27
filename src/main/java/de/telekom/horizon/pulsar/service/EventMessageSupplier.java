@@ -14,6 +14,7 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
 import de.telekom.eni.pandora.horizon.model.meta.EventRetentionTime;
+import de.telekom.eni.pandora.horizon.mongo.model.MessageStateMongoDocument;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
@@ -27,14 +28,16 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.bson.types.ObjectId;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
@@ -177,27 +180,31 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
 
+            Optional<MessageStateMongoDocument> offsetMsg = Optional.empty();
             if (StringUtils.isNoneEmpty(currentOffset)) {
-                var offsetMsg = messageStateMongoRepo.findById(currentOffset);
-                if (offsetMsg.isPresent()) {
-                    var offsetTimestamp = offsetMsg.get().getTimestamp();
+                offsetMsg = messageStateMongoRepo.findById(currentOffset);
+            }
 
-                    var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
-                                    DeliveryType.SERVER_SENT_EVENT,
-                                    subscriptionId,
-                                    offsetTimestamp,
-                                    pageable
-                            ).stream()
-                            .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
-                            .toList();
+            if (offsetMsg.isPresent()) {
+                var offsetTimestamp = offsetMsg.get().getTimestamp();
 
-                    messageStates.addAll(list);
+                var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
+                                DeliveryType.SERVER_SENT_EVENT,
+                                subscriptionId,
+                                offsetTimestamp,
+                                pageable
+                        ).stream()
+                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
+                        .toList();
 
-                    if (!list.isEmpty()) {
-                        currentOffset = list.getLast().getUuid();
-                    }
+                messageStates.addAll(list);
+
+                if (!list.isEmpty()) {
+                    currentOffset = list.getLast().getUuid();
                 }
             } else {
+                currentOffset = null;
+
                 var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
                                 List.of(Status.PROCESSED),
                                 DeliveryType.SERVER_SENT_EVENT,
