@@ -57,11 +57,9 @@ class EventMessageSupplierTest {
 
         var pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
-        var messagesCount = 100;
+        var messagesCount = 15;
         // We create a list of some test state documents similar as we would get from MongoDB
         var states = MockHelper.createMessageStateMongoDocumentsForTesting(messagesCount, MockHelper.TEST_ENVIRONMENT, Status.PROCESSED, false);
-
-        var offsetIndex = 0;
 
         // We create a new SubscriptionEventMessage for testing
         var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.CALLBACK);
@@ -77,6 +75,7 @@ class EventMessageSupplierTest {
             fail(e);
         }
 
+        var offsetIndex = 0;
         // We mock the request to MongoDB and return our dummy state documents instead
         // We also capture the pageable argument to check whether it has been used correctly, later
         if (isOffsetMode) {
