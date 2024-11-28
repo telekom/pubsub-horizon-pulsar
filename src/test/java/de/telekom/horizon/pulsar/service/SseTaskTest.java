@@ -25,6 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -36,6 +38,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -66,8 +69,9 @@ class SseTaskTest {
         sseTaskSpy = spy(sseTask);
     }
 
-    @Test
-    void testRun() throws IOException {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRun(boolean ignoreDeduplication) throws IOException {
         final var o = new ObjectMapper();
         // For this test we set the timeout to 10s to simulate the automatic timeout if there are no new events flowing
         final var timeout = 10000L;
@@ -76,7 +80,14 @@ class SseTaskTest {
         // We create a new SubscriptionEventMessage queue and add some test messages
         var itemQueue = new ConcurrentLinkedQueue<SubscriptionEventMessage>();
         itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
-        itemQueue.add(MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT));
+        var item = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT);
+        itemQueue.add(item);
+
+        // add duplicates
+        var duplicatesNumber = 2;
+        for (var i = 0; i < duplicatesNumber; i++) {
+            itemQueue.add(item);
+        }
 
         final var itemQueueInitialSize = itemQueue.size();
 
@@ -99,7 +110,7 @@ class SseTaskTest {
         // We mock the EventMessageSupplier since it's tested in a separate test
         when(eventMessageSupplierMock.get()).thenAnswer(i -> {
             await().pollDelay(10, TimeUnit.MILLISECONDS).untilTrue(new AtomicBoolean(true));
-            return new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), false, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
+            return new EventMessageContext(itemQueue.poll(), false, new StreamLimit(), ignoreDeduplication, Mockito.mock(Span.class), Mockito.mock(Tracer.SpanInScope.class));
         });
         when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
         // The following checks that we track a DELIVERED event with the de-duplication service
@@ -117,6 +128,19 @@ class SseTaskTest {
         when(metricsHelper.buildTagsFromSubscriptionEventMessage(any())).thenReturn(Tags.empty());
         when(metricsHelper.getRegistry()).thenReturn(registryMock);
 
+        var mockedDeduplicationCache = new HashMap<String, String>();
+        when(MockHelper.deDuplicationService.track(any(SubscriptionEventMessage.class))).thenAnswer(invocation -> {
+            SubscriptionEventMessage msg = invocation.getArgument(0);
+            return mockedDeduplicationCache.put(msg.getUuid(), msg.getUuid());
+        });
+
+        if (!ignoreDeduplication) {
+            when(MockHelper.deDuplicationService.get(any(SubscriptionEventMessage.class))).thenAnswer(invocation -> {
+                SubscriptionEventMessage msg = invocation.getArgument(0);
+                return mockedDeduplicationCache.get(msg.getUuid());
+            });
+        }
+
         // PUBLIC METHOD WE WANT TO TEST
         sseTaskSpy.run();
 
@@ -133,17 +157,28 @@ class SseTaskTest {
         verify(emitterMock, never()).completeWithError(any(ConnectionCutOutException.class));
         // Verify that ResponseBodyEmitter emits data
         ArgumentCaptor<String> jsonStringCaptor = ArgumentCaptor.forClass(String.class);
-        verify(emitterMock, times(itemQueueInitialSize)).send(jsonStringCaptor.capture());
+        // Verify that for each emitted event a DELIVERED status will be written
+        ArgumentCaptor<StatusMessage> statusMessageCaptor = ArgumentCaptor.forClass(StatusMessage.class);
+
+        if (ignoreDeduplication) {
+            verify(emitterMock, times(itemQueueInitialSize)).send(jsonStringCaptor.capture());
+            verify(eventWriterMock, times(itemQueueInitialSize)).send(anyString(), statusMessageCaptor.capture(), any(HorizonTracer.class));
+            // Verify that de-duplication logic is bypassed
+            verify(MockHelper.deDuplicationService, times(itemQueueInitialSize)).track(any());
+        } else {
+            verify(emitterMock, times(itemQueueInitialSize - duplicatesNumber)).send(jsonStringCaptor.capture());
+            verify(eventWriterMock, times(itemQueueInitialSize - duplicatesNumber)).send(anyString(), statusMessageCaptor.capture(), any(HorizonTracer.class));
+            // Verify that for each emitted event a de-duplication entry will be written
+            verify(MockHelper.deDuplicationService, times(itemQueueInitialSize - duplicatesNumber)).track(any());
+        }
+
         assertNotNull(jsonStringCaptor.getValue());
         var event = o.readValue(jsonStringCaptor.getValue(), Event.class);
         assertNotNull(event);
-        // Verify that for each emitted event a DELIVERED status will be written
-        ArgumentCaptor<StatusMessage> statusMessageCaptor = ArgumentCaptor.forClass(StatusMessage.class);
-        verify(eventWriterMock, times(itemQueueInitialSize)).send(anyString(), statusMessageCaptor.capture(), any(HorizonTracer.class));
+
         assertNotNull(statusMessageCaptor.getValue());
         assertEquals(Status.DELIVERED, statusMessageCaptor.getValue().getStatus());
-        // Verify that for each emitted event a de-duplication entry will be written
-        verify(MockHelper.deDuplicationService, times(itemQueueInitialSize)).track(any());
+
         // Verify that ResponseBodyEmitter finishes with a ConnectionTimeoutException
         verify(emitterMock, times(1)).completeWithError(any(ConnectionTimeoutException.class));
         // Verify that emitter has completed
