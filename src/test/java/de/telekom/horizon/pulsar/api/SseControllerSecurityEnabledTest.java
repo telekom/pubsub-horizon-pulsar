@@ -88,7 +88,7 @@ class SseControllerSecurityEnabledTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         verify(sseService, times(1)).validateSubscriberIdForSubscription(eq(env), eq(subscriptionId));
-        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true), any(StreamLimit.class));
+        verify(sseService, times(1)).startEmittingEvents(eq(env), eq(subscriptionId), any(String.class), eq(true), any(), any(StreamLimit.class));
     }
 
     private Jwt getJwt(String subscriberId) {

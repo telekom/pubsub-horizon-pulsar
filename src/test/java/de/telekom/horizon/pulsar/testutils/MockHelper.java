@@ -37,10 +37,7 @@ import org.springframework.http.MediaType;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -64,12 +61,7 @@ public class MockHelper {
     public static ResponseBodyEmitter emitter;
     public static TokenService tokenService;
     public static HorizonMetricsHelper metricsHelper;
-
     public static DeDuplicationService deDuplicationService;
-
-
-
-    public static String TEST_EVENT_ID = "abc123-def456-ghi789";
     public static String TEST_ENVIRONMENT = "bond";
     public static String TEST_SUBSCRIPTION_ID = "1-2-3";
     public static String TEST_SUBSCRIBER_ID = "eni-pan-dora";
@@ -105,14 +97,14 @@ public class MockHelper {
         sseTaskFactory = new SseTaskFactory(pulsarConfig, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, metricsHelper, tracingHelper);
     }
 
-    public static SubscriptionEventMessage createSubscriptionEventMessageForTesting(DeliveryType deliveryType, boolean withAdditionalFields) {
+    public static SubscriptionEventMessage createSubscriptionEventMessageForTesting(DeliveryType deliveryType) {
         var subscriptionEventMessageForTesting = new SubscriptionEventMessage();
 
         var event = new Event();
         event.setId(RandomStringUtils.random(12, true, true));
         event.setData(Map.of("message", "foobar"));
 
-        subscriptionEventMessageForTesting.setUuid(TEST_EVENT_ID);
+        subscriptionEventMessageForTesting.setUuid(UUID.randomUUID().toString());
         subscriptionEventMessageForTesting.setEvent(event);
         subscriptionEventMessageForTesting.setEnvironment(TEST_ENVIRONMENT);
         subscriptionEventMessageForTesting.setSubscriptionId(TEST_SUBSCRIPTION_ID);
@@ -173,6 +165,11 @@ public class MockHelper {
     public static List<State> createStatesForTesting (int count, String environment, Status status, boolean randomSubscriptionId) {
         var states = new ArrayList<State>();
         for (int i = 0; i < count; i++) {
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             states.add(createStateForTesting(environment, status, randomSubscriptionId));
         }
         return states;

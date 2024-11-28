@@ -14,6 +14,7 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
 import de.telekom.eni.pandora.horizon.model.meta.EventRetentionTime;
+import de.telekom.eni.pandora.horizon.mongo.model.MessageStateMongoDocument;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
@@ -25,6 +26,7 @@ import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -62,16 +65,19 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     private final HorizonTracer tracingHelper;
     private final ConcurrentLinkedQueue<State> messageStates = new ConcurrentLinkedQueue<>();
     private Instant lastPoll;
+    private String currentOffset;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Constructs an instance of {@code EventMessageSupplier}.
      *
-     * @param subscriptionId    The subscriptionId for which messages are fetched.
-     * @param factory           The {@link SseTaskFactory} used for obtaining related components.
+     * @param subscriptionId     The subscriptionId for which messages are fetched.
+     * @param factory            The {@link SseTaskFactory} used for obtaining related components.
      * @param includeHttpHeaders Boolean flag indicating whether to include HTTP headers in the generated {@code EventMessageContext}.
+     * @param startingOffset             Enables offset based streaming. Specifies the offset (message id) of the last received event message.
+     * @param streamLimit        The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
      */
-    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, StreamLimit streamLimit) {
+    public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, String startingOffset, StreamLimit streamLimit) {
         this.subscriptionId = subscriptionId;
 
         this.pulsarConfig = factory.getPulsarConfig();
@@ -80,6 +86,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         this.eventWriter = factory.getEventWriter();
         this.tracingHelper = factory.getTracingHelper();
         this.includeHttpHeaders = includeHttpHeaders;
+        this.currentOffset = startingOffset;
         this.streamLimit = streamLimit;
     }
 
@@ -98,6 +105,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
         if (!messageStates.isEmpty()) {
             var state = messageStates.poll();
+            var ignoreDeduplication = StringUtils.isNotEmpty(currentOffset);
 
             // TODO: these spans get duplicated cause of the vortex latency - will be resolved DHEI-13764
 
@@ -120,12 +128,13 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         var errorMessage = String.format("Event message %s did not match subscriptionId %s", state.getUuid(), state.getSubscriptionId());
                         throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
                     }
-                }
 
-                return new EventMessageContext(message, includeHttpHeaders, streamLimit, span, spanInScope);
+                    Optional.ofNullable(message.getHttpHeaders()).ifPresent(headers -> headers.put("x-pubsub-offset-id", new ArrayList<>(List.of(state.getUuid()))));
+                }
+                return new EventMessageContext(message, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
                 handleException(state, e);
-                return new EventMessageContext(null, includeHttpHeaders, streamLimit, span, spanInScope);
+                return new EventMessageContext(null, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } finally {
                 pickSpan.finish();
             }
@@ -171,16 +180,42 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
 
-            var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
-                    List.of(Status.PROCESSED),
-                    DeliveryType.SERVER_SENT_EVENT,
-                    subscriptionId,
-                    pageable
-            ).stream()
-                    .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
-                    .toList();
+            Optional<MessageStateMongoDocument> offsetMsg = Optional.empty();
+            if (StringUtils.isNoneEmpty(currentOffset)) {
+                offsetMsg = messageStateMongoRepo.findById(currentOffset);
+            }
 
-            messageStates.addAll(list);
+            if (offsetMsg.isPresent()) {
+                var offsetTimestamp = offsetMsg.get().getTimestamp();
+
+                var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
+                                DeliveryType.SERVER_SENT_EVENT,
+                                subscriptionId,
+                                offsetTimestamp,
+                                pageable
+                        ).stream()
+                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
+                        .toList();
+
+                messageStates.addAll(list);
+
+                if (!list.isEmpty()) {
+                    currentOffset = list.getLast().getUuid();
+                }
+            } else {
+                currentOffset = null;
+
+                var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                                List.of(Status.PROCESSED),
+                                DeliveryType.SERVER_SENT_EVENT,
+                                subscriptionId,
+                                pageable
+                        ).stream()
+                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
+                        .toList();
+
+                messageStates.addAll(list);
+            }
 
             lastPoll = Instant.now();
         }
