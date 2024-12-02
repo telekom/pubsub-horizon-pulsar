@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
+import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
@@ -16,9 +17,11 @@ import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.ConnectionCutOutException;
 import de.telekom.horizon.pulsar.exception.ConnectionTimeoutException;
+import de.telekom.horizon.pulsar.exception.StreamLimitExceededException;
 import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseResponseWrapper;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +31,17 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.web.server.UnsupportedMediaTypeStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
+
+import static de.telekom.eni.pandora.horizon.metrics.HorizonMetricsConstants.METRIC_SENT_SSE_EVENTS;
 
 /**
  * Represents a Server-Sent Events (SSE) task responsible for emitting events to clients.
@@ -47,17 +55,27 @@ public class SseTask implements Runnable {
     private static final String TIMEOUT_MESSAGE = "No events received for more than %s ms";
 
     private final SseTaskStateContainer sseTaskStateContainer;
+
+    private final EventMessageSupplier eventMessageSupplier;
+
     @Getter
     private final AtomicInteger openConnectionGaugeValue;
     private final PulsarConfig pulsarConfig;
     private final EventWriter eventWriter;
     private final DeDuplicationService deDuplicationService;
     private final HorizonTracer tracingHelper;
+    private final HorizonMetricsHelper metricsHelper;
 
     @Setter
     private String contentType = APPLICATION_STREAM_JSON_VALUE;
-    private final Stream<EventMessageContext> stream;
+
+    @Getter
+    private Instant startTime;
+    @Getter
+    private Instant stopTime;
     private Instant lastEventMessage = Instant.now();
+    private AtomicLong bytesConsumed = new AtomicLong(0);
+    private AtomicLong numberConsumed = new AtomicLong(0);
 
     private final AtomicBoolean isCutOut = new AtomicBoolean(false);
     private final AtomicBoolean isEmitterCompleted = new AtomicBoolean(false);
@@ -78,14 +96,14 @@ public class SseTask implements Runnable {
                    SseTaskFactory factory) {
 
         this.sseTaskStateContainer = sseTaskStateContainer;
+        this.eventMessageSupplier = eventMessageSupplier;
         this.openConnectionGaugeValue = openConnectionGaugeValue;
 
         this.pulsarConfig = factory.getPulsarConfig();
         this.eventWriter = factory.getEventWriter();
         this.deDuplicationService = factory.getDeDuplicationService();
         this.tracingHelper = factory.getTracingHelper();
-
-        this.stream = createStreamTopology(eventMessageSupplier);
+        this.metricsHelper = factory.getMetricsHelper();
     }
 
     /**
@@ -116,6 +134,8 @@ public class SseTask implements Runnable {
      */
     @Override
     public void run() {
+        var stream = createStreamTopology(eventMessageSupplier);
+
         if (sseTaskStateContainer.getCanceled().get()) {
             return;
         }
@@ -123,6 +143,8 @@ public class SseTask implements Runnable {
         // Monitor the status of the emitter completion.
         sseTaskStateContainer.getEmitter().onCompletion(() -> isEmitterCompleted.compareAndExchange(false, true));
         sseTaskStateContainer.getEmitter().onError(e -> isEmitterCompleted.compareAndExchange(false, true));
+
+        startTime = Instant.now();
 
         // Mark the task as running and increment the open connection gauge value.
         sseTaskStateContainer.getRunning().compareAndExchange(false, true);
@@ -136,6 +158,7 @@ public class SseTask implements Runnable {
             sseTaskStateContainer.getEmitter().completeWithError(e);
         } finally {
             openConnectionGaugeValue.getAndSet(0);
+            stopTime = Instant.now();
         }
     }
 
@@ -170,6 +193,19 @@ public class SseTask implements Runnable {
             context.finishSpan();
 
             return false;
+        }
+
+        final StreamLimit streamLimit = context.getStreamLimit();
+        if (streamLimit != null) {
+            final boolean maxNumberExceeded = streamLimit.getMaxNumber() > 0 && numberConsumed.get() >= streamLimit.getMaxNumber();
+            final boolean maxMinutesExceeded = streamLimit.getMaxMinutes() > 0 && ChronoUnit.MINUTES.between(startTime, Instant.now()) >= streamLimit.getMaxMinutes();
+            final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed.get() >= streamLimit.getMaxBytes();
+
+            if (maxNumberExceeded || maxMinutesExceeded || maxBytesExceeded) {
+                sseTaskStateContainer.getEmitter().completeWithError(new StreamLimitExceededException());
+                context.finishSpan();
+                return false;
+            }
         }
 
         return true;
@@ -241,23 +277,26 @@ public class SseTask implements Runnable {
             return;
         }
 
-        String msgUuidOrNull = deDuplicationService.get(msg);
-        boolean isDuplicate = Objects.nonNull(msgUuidOrNull);
-        if (isDuplicate) {
-            if(Objects.equals(msg.getUuid(), msgUuidOrNull)) {
-                log.debug("Message with id {} was found in the deduplication cache with the same UUID. Message will be ignored, because status will probably set to DELIVERED in the next minutes.", msg.getUuid());
-            } else {
-                log.debug("Message with id {} was found in the deduplication cache with another UUID. Message will be set to DUPLICATE to prevent event being stuck at PROCESSED.", msg.getUuid());
-                pushMetadata(msg, Status.DUPLICATE, null);
-            }
+        if (!context.isIgnoreDeduplication()) {
+            String msgUuidOrNull = deDuplicationService.get(msg);
+            boolean isDuplicate = Objects.nonNull(msgUuidOrNull);
+            if (isDuplicate) {
+                if(Objects.equals(msg.getUuid(), msgUuidOrNull)) {
+                    log.debug("Message with id {} was found in the deduplication cache with the same UUID. Message will be ignored, because status will probably set to DELIVERED in the next minutes.", msg.getUuid());
+                } else {
+                    log.debug("Message with id {} was found in the deduplication cache with another UUID. Message will be set to DUPLICATE to prevent event being stuck at PROCESSED.", msg.getUuid());
+                    pushMetadata(msg, Status.DUPLICATE, null);
+                }
 
-            context.finishSpan();
-            return;
+                context.finishSpan();
+                return;
+            }
         }
 
         try {
             sendEvent(msg, context.getIncludeHttpHeaders());
         } finally {
+
             context.finishSpan();
         }
     }
@@ -277,9 +316,15 @@ public class SseTask implements Runnable {
 
         try {
             var eventJson = serializeEvent(new SseResponseWrapper(msg, includeHttpHeaders));
+
             sseTaskStateContainer.getEmitter().send(eventJson);
 
             pushMetadata(msg, Status.DELIVERED, null);
+
+            bytesConsumed.addAndGet(eventJson.getBytes(StandardCharsets.UTF_8).length);
+            numberConsumed.incrementAndGet();
+
+            metricsHelper.getRegistry().counter(METRIC_SENT_SSE_EVENTS, metricsHelper.buildTagsFromSubscriptionEventMessage(msg)).increment();
         } catch (JsonProcessingException e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
             log.info(err, e);

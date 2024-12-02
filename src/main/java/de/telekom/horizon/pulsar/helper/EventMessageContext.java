@@ -17,7 +17,7 @@ import java.util.Optional;
  * Context class representing the context of an event message in a subscription.
  *
  * This class encapsulates information related to a subscription event message, including
- * whether to include HTTP headers, and optional tracing components such as a span and span in scope.
+ * whether to include HTTP headers or stream limits, and optional tracing components such as a span and span in scope.
  * It provides a method to finish the span and span in scope if they are present.
  */
 
@@ -28,6 +28,11 @@ public class EventMessageContext {
     private SubscriptionEventMessage subscriptionEventMessage;
     @Getter
     private Boolean includeHttpHeaders;
+    @Getter
+    private StreamLimit streamLimit;
+    @Getter
+    private boolean ignoreDeduplication;
+
     private Span span;
     private Tracer.SpanInScope spanInScope;
     public void finishSpan() {

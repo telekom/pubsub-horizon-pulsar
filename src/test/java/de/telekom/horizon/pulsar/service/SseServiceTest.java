@@ -4,8 +4,14 @@
 
 package de.telekom.horizon.pulsar.service;
 
+import com.hazelcast.cluster.Cluster;
+import com.hazelcast.cluster.Member;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.topic.ITopic;
+import de.telekom.horizon.pulsar.cache.ConnectionCache;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -88,10 +96,33 @@ class SseServiceTest {
         verify(taskExecutorSpy).setQueueCapacity(MockHelper.pulsarConfig.getQueueCapacity());
         verify(taskExecutorSpy).afterPropertiesSet();
 
-        // We are mocking the actual task here
-        var sseTaskMock = Mockito.mock(SseTask.class);
+        var sseTask = new SseTask(Mockito.mock(SseTaskStateContainer.class), Mockito.mock(EventMessageSupplier.class), MockHelper.openConnectionGaugeValue, sseTaskFactoryMock);
 
-        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false))).thenReturn(sseTaskMock);
+        // We are spying on the actual task here
+        var sseTaskSpy= Mockito.spy(sseTask);
+
+        var hazelcastInstanceMock = Mockito.mock(HazelcastInstance.class);
+
+        var cacheClusterMock = Mockito.mock(Cluster.class);
+        var cacheMemberMock = Mockito.mock(Member.class);
+
+        when(hazelcastInstanceMock.getCluster()).thenReturn(cacheClusterMock);
+        when(cacheClusterMock.getLocalMember()).thenReturn(cacheMemberMock);
+        when(cacheMemberMock.getUuid()).thenReturn(UUID.fromString("477bf3c9-ef1f-41de-9574-419a2ab61131"));
+
+        var cacheWorkers = Mockito.mock(ITopic.class);
+        when(hazelcastInstanceMock.getTopic("workers")).thenReturn(cacheWorkers);
+
+        var connectionCache = new ConnectionCache(hazelcastInstanceMock);
+
+        var map = new ConcurrentHashMap<>();
+        map.put(MockHelper.TEST_SUBSCRIPTION_ID, sseTaskSpy);
+        ReflectionTestUtils.setField(connectionCache, "map", map, ConcurrentHashMap.class);
+
+        var connectionCacheSpy = Mockito.spy(connectionCache);
+
+        when(sseTaskFactoryMock.getConnectionCache()).thenReturn(connectionCacheSpy);
+        when(sseTaskFactoryMock.createNew(eq(MockHelper.TEST_ENVIRONMENT), eq(MockHelper.TEST_SUBSCRIPTION_ID), eq(MockHelper.TEST_CONTENT_TYPE), sseTaskStateContainerCaptor.capture(), eq(false), any(), any(StreamLimit.class))).thenReturn(sseTaskSpy);
 
         // The mocked task should trigger the termination condition of SseTaskStateContainer.setReady(long timeout) immediately
         // otherwise startEmittingEvents() would run until the timeout is reached, since setReady() is not called asynchronously
@@ -116,13 +147,17 @@ class SseServiceTest {
         }).start();
 
         // PUBLIC METHOD WE WANT TO TEST
-        var responseContainer = sseService.startEmittingEvents(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, false);
+        var responseContainer = sseService.startEmittingEvents(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, false, null, new StreamLimit());
 
         latch.countDown();
 
         assertNotNull(responseContainer);
+        verify(taskExecutorSpy).submit(sseTaskSpy);
 
-        verify(taskExecutorSpy).submit(sseTaskMock);
+        sseService.stopEmittingEvents(MockHelper.TEST_SUBSCRIPTION_ID);
+
+        verify(sseTaskSpy).terminate();
+        verify(connectionCacheSpy).removeConnectionForSubscription(MockHelper.TEST_SUBSCRIPTION_ID);
     }
 }
 

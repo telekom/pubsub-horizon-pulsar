@@ -8,6 +8,7 @@ import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +33,6 @@ public class SseService {
     private final SseTaskFactory sseTaskFactory;
     private final SubscriberCache subscriberCache;
     private final PulsarConfig pulsarConfig;
-
     private final ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
 
     /**
@@ -90,19 +90,30 @@ public class SseService {
     /**
      * Starts emitting events for the specified subscription.
      *
-     * @param environment      The environment associated with the subscription.
-     * @param subscriptionId   The ID of the subscription for which events should be emitted.
-     * @param contentType      The content type for the events.
-     * @param includeHttpHeaders A boolean flag indicating whether to include HTTP headers in the emitted events.
-     * @return The {@link SseTaskStateContainer} representing the state of the emitted events.
+     * @param environment         The environment associated with the subscription.
+     * @param subscriptionId      The ID of the subscription for which events should be emitted.
+     * @param contentType         The content type for the events.
+     * @param includeHttpHeaders  A boolean flag indicating whether to include HTTP headers in the emitted events.
+     * @param offset              Enables offset based streaming. Specifies the offset (message id) of the last received event message.
+     * @param streamLimit         The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
+     * @return                    The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
-    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders) {
+    public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, String offset, StreamLimit streamLimit) {
         var responseContainer = new SseTaskStateContainer();
 
-        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders));
+        taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, offset, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
 
         return responseContainer;
+    }
+
+    /**
+     * Stops emitting events for an existing active stream.
+     *
+     * @param subscriptionId   The ID of the subscription for which events are being emitted.
+     */
+    public void stopEmittingEvents(String subscriptionId) {
+        sseTaskFactory.getConnectionCache().removeConnectionForSubscription(subscriptionId);
     }
 }

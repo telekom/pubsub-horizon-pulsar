@@ -5,10 +5,7 @@
 package de.telekom.horizon.pulsar.api;
 
 import de.telekom.eni.pandora.horizon.model.common.ProblemMessage;
-import de.telekom.horizon.pulsar.exception.ConnectionCutOutException;
-import de.telekom.horizon.pulsar.exception.ConnectionTimeoutException;
-import de.telekom.horizon.pulsar.exception.QueueWaitTimeoutException;
-import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
+import de.telekom.horizon.pulsar.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +61,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
      */
     @ExceptionHandler(value = {
             ConnectionCutOutException.class,
+            StreamLimitExceededException.class
     })
     @ResponseStatus(HttpStatus.OK)
     protected ResponseEntity<Object> handleCutOut(Exception e, WebRequest request) {

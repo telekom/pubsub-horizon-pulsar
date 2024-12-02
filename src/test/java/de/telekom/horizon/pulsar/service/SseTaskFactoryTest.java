@@ -10,6 +10,7 @@ import de.telekom.eni.pandora.horizon.kubernetes.resource.Subscription;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResourceSpec;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class SseTaskFactoryTest {
     void setupSseTaskFactoryTest() {
         MockHelper.init();
 
-        sseTaskFactorySpy = spy(new SseTaskFactory(MockHelper.pulsarConfig, MockHelper.connectionCache, MockHelper.connectionGaugeCache, MockHelper.eventWriter, MockHelper.kafkaPicker, MockHelper.messageStateMongoRepo, MockHelper.deDuplicationService, MockHelper.tracingHelper));
+        sseTaskFactorySpy = spy(new SseTaskFactory(MockHelper.pulsarConfig, MockHelper.connectionCache, MockHelper.connectionGaugeCache, MockHelper.eventWriter, MockHelper.kafkaPicker, MockHelper.messageStateMongoRepo, MockHelper.deDuplicationService, MockHelper.metricsHelper, MockHelper.tracingHelper));
     }
 
     SubscriptionResource createSubscriptionResource() {
@@ -62,7 +63,7 @@ class SseTaskFactoryTest {
         when(MockHelper.connectionGaugeCache.getOrCreateGaugeForSubscription(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID)).thenReturn(new AtomicInteger(1));
 
         // PUBLIC METHOD WE WANT TO TEST
-        var task = sseTaskFactorySpy.createNew(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, sseTaskStateContainer, false);
+        var task = sseTaskFactorySpy.createNew(MockHelper.TEST_ENVIRONMENT, MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.TEST_CONTENT_TYPE, sseTaskStateContainer, false, null, new StreamLimit());
         assertNotNull(task);
 
         // Let's verify that connectionGaugeCache.getOrCreateGaugeForSubscription(String environment, String subscriptionId) is called

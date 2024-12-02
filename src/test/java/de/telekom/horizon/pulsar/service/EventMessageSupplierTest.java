@@ -7,9 +7,11 @@ package de.telekom.horizon.pulsar.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
+import de.telekom.eni.pandora.horizon.model.db.State;
 import de.telekom.eni.pandora.horizon.model.event.DeliveryType;
 import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.StatusMessage;
+import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.testutils.MockHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -27,6 +29,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,28 +47,22 @@ class EventMessageSupplierTest {
     void setupEventMessageSupplierTest() {
         MockHelper.init();
 
-        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false);
+        eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, null, new StreamLimit());
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {10})
-    void testGetEventMessageContext(int polls) {
+    @ValueSource(booleans = {false, true})
+    void testGetEventMessageContext(boolean isOffsetMode) {
         final var objectMapper = new ObjectMapper();
 
         var pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
+        var messagesCount = 15;
         // We create a list of some test state documents similar as we would get from MongoDB
-        var states = MockHelper.createMessageStateMongoDocumentsForTesting(MockHelper.pulsarConfig.getSseBatchSize(), MockHelper.TEST_ENVIRONMENT, Status.PROCESSED, false);
-
-        // We mock the request to MongoDB and return our dummy state documents instead
-        // We also capture the pageable argument to check whether is has been used correctly, later
-        when(MockHelper.messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(eq(List.of(Status.PROCESSED)),
-                eq(DeliveryType.SERVER_SENT_EVENT),
-                eq(MockHelper.TEST_SUBSCRIPTION_ID),
-                pageableCaptor.capture())).thenReturn(new SliceImpl<>(states));
+        var states = MockHelper.createMessageStateMongoDocumentsForTesting(messagesCount, MockHelper.TEST_ENVIRONMENT, Status.PROCESSED, false);
 
         // We create a new SubscriptionEventMessage for testing
-        var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.CALLBACK, false);
+        var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.CALLBACK);
 
         // We mock the picked message from Kafka
         ConsumerRecord<String, String> record = Mockito.mock(ConsumerRecord.class);
@@ -77,21 +75,58 @@ class EventMessageSupplierTest {
             fail(e);
         }
 
-        // EventWriter ha private access and will be created in the constructor of the SseTaskFactory
+        var offsetIndex = 0;
+        // We mock the request to MongoDB and return our dummy state documents instead
+        // We also capture the pageable argument to check whether it has been used correctly, later
+        if (isOffsetMode) {
+            offsetIndex = 4;
+            var offsetMessage = states.get(offsetIndex);
+
+            eventMessageSupplier = new EventMessageSupplier(MockHelper.TEST_SUBSCRIPTION_ID, MockHelper.sseTaskFactory, false, offsetMessage.getUuid(), new StreamLimit());
+
+            when(MockHelper.messageStateMongoRepo.findById(anyString())).thenAnswer(invocation -> {
+               String uuid = invocation.getArgument(0);
+               return states.stream().filter(s -> s.getUuid().equals(uuid)).findAny();
+            });
+            when(MockHelper.messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(eq(DeliveryType.SERVER_SENT_EVENT),
+                    eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                    any(Date.class),
+                    pageableCaptor.capture())).thenAnswer(invocation ->  {
+                        Date timestamp = invocation.getArgument(2);
+                        var slice = states.stream().filter(s -> s.getTimestamp().toInstant().isAfter(timestamp.toInstant())).sorted(Comparator.comparing(State::getTimestamp)).limit(MockHelper.pulsarConfig.getSseBatchSize()).toList();
+                        return new SliceImpl<>(slice);
+            });
+        } else {
+            when(MockHelper.messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(eq(List.of(Status.PROCESSED)),
+                    eq(DeliveryType.SERVER_SENT_EVENT),
+                    eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                    pageableCaptor.capture())).thenAnswer(invocation -> {
+                        var slice = states.stream().filter(a -> a.getStatus() == Status.PROCESSED).sorted(Comparator.comparing(State::getTimestamp)).limit(MockHelper.pulsarConfig.getSseBatchSize()).toList();
+                        return new SliceImpl<>(slice);
+            });
+        }
+
+        // EventWriter has private access and will be created in the constructor of the SseTaskFactory
         // Since we want to check invocations with it, we will overwrite the EventWriter in EventMessageSupplier via reflections
         var eventWriterMock = mock(EventWriter.class);
         ReflectionTestUtils.setField(eventMessageSupplier, "eventWriter", eventWriterMock, EventWriter.class);
 
-
+        var startAt = 0;
+        if (isOffsetMode) {
+            startAt = offsetIndex +1;
+        }
         // We do multiple calls to EventMessageSupplier.get() in order to test
         // that each call will fetch the next event message in the queue
-        for (int i = 0; i < polls; i++) {
+        for(int i = startAt; i < states.size(); i++) {
             // We mock the actual picking of a message from Kafka here
             when(MockHelper.kafkaTemplate.receive(eq(MockHelper.TEST_TOPIC), eq(states.get(i).getCoordinates().partition()), eq(states.get(i).getCoordinates().offset()), eq(Duration.ofMillis(30000)))).thenReturn(record);
 
             // PUBLIC METHOD WE WANT TO TEST
             var result = eventMessageSupplier.get();
             assertNotNull(result);
+
+            // mock Vortex setting event to DELIVERED
+            states.get(i).setStatus(Status.DELIVERED);
 
             // Check that we fetch batches from MongoDB correctly
             var pageable = pageableCaptor.getValue();
@@ -126,7 +161,7 @@ class EventMessageSupplierTest {
         // We create a new SubscriptionEventMessage for testing,
         // and we overwrite the subscriptionId so that it doesn't match the standard testing subscriptionId
         // in the state messages anymore
-        var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.CALLBACK, false);
+        var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.CALLBACK);
         subscriptionEventMessage.setSubscriptionId("something different");
 
         // We mock the picked message from Kafka
