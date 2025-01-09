@@ -26,7 +26,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,heapdump,shutdown,horizon-prestop
+        include: health,info,prometheus,heapdump,shutdown
   endpoint:
     health:
       show-details: always
