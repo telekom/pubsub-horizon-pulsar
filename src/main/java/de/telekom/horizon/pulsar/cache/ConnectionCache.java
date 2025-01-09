@@ -8,7 +8,7 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
-import de.telekom.horizon.pulsar.actuator.HorizonPreStopEvent;
+import de.telekom.horizon.pulsar.actuator.StopActiveConnectionsEvent;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
@@ -94,7 +94,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     }
 
     @EventListener
-    public void handleHorizonPreStopEvent(HorizonPreStopEvent event) {
+    public void handleHorizonPreStopEvent(StopActiveConnectionsEvent event) {
         log.info(event.getMessage());
         terminateAllConnections();
     }

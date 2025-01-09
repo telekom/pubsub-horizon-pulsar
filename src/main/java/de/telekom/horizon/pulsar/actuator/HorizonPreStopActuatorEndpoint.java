@@ -4,24 +4,78 @@
 
 package de.telekom.horizon.pulsar.actuator;
 
+import de.telekom.horizon.pulsar.config.PodConfig;
+import io.fabric8.kubernetes.api.model.EndpointAddress;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+@Slf4j
 @Component
 @Endpoint(id = "horizon-prestop")
 public class HorizonPreStopActuatorEndpoint {
 
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final PodConfig podConfig;
 
-    public HorizonPreStopActuatorEndpoint(ApplicationEventPublisher applicationEventPublisher) {
-        this.applicationEventPublisher = applicationEventPublisher;
+    private final KubernetesClient kubernetesClient;
+
+    public HorizonPreStopActuatorEndpoint(PodConfig podConfig, KubernetesClient kubernetesClient) {
+        this.podConfig = podConfig;
+        this.kubernetesClient = kubernetesClient;
     }
 
     @WriteOperation
     public void handlePreStop() {
-        var event = new HorizonPreStopEvent(this, "Got PreStop request. Terminating all connections...");
-        applicationEventPublisher.publishEvent(event);
+        waitUntil(() -> !isEndpointRegistered(), 10, TimeUnit.SECONDS, 1000);
+    }
+
+    @FunctionalInterface
+    public interface CheckCondition {
+        boolean check();
+    }
+
+    public static void waitUntil(CheckCondition condition, long timeout, TimeUnit unit, long delayMillis) {
+        long timeoutNanos = unit.toNanos(timeout);
+        long startTime = System.nanoTime();
+
+        while (System.nanoTime() - startTime < timeoutNanos) {
+            try {
+                if (condition.check()) {
+                    return; // Exit as soon as the condition is true
+                }
+                Thread.sleep(delayMillis); // Avoid busy-waiting
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // Restore the interrupted status
+                throw new RuntimeException("Thread was interrupted", e);
+            }
+        }
+    }
+
+    public boolean isEndpointRegistered() {
+        try {
+            var endpoints = kubernetesClient.endpoints().inNamespace(podConfig.getPodNamespace()).withName(podConfig.getServiceName()).get();
+
+            if (endpoints.getSubsets() != null) {
+                for (var subset : endpoints.getSubsets()) {
+                    List<String> addresses = subset.getAddresses()
+                            .stream()
+                            .map(EndpointAddress::getIp)
+                            .toList();
+
+                    if (addresses.contains(podConfig.getPodIp())) {
+                        return true; // Pod's IP exists in the endpoints list
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Could not check endpoint status", e);
+        }
+
+        return false;
     }
 }
