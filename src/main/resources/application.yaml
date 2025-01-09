@@ -70,7 +70,11 @@ horizon:
     compression:
       enabled: ${PULSAR_KAFKA_COMPRESSION_ENABLED:false}
       type: ${PULSAR_KAFKA_COMPRESSION_TYPE:none}
+
   mongo:
+    enabled: true
+
+  kubernetes:
     enabled: true
 
 pandora:
