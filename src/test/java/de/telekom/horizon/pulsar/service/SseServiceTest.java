@@ -113,7 +113,7 @@ class SseServiceTest {
         var cacheWorkers = Mockito.mock(ITopic.class);
         when(hazelcastInstanceMock.getTopic("workers")).thenReturn(cacheWorkers);
 
-        var connectionCache = new ConnectionCache(hazelcastInstanceMock);
+        var connectionCache = new ConnectionCache(MockHelper.pulsarConfig, hazelcastInstanceMock);
 
         var map = new ConcurrentHashMap<>();
         map.put(MockHelper.TEST_SUBSCRIPTION_ID, sseTaskSpy);

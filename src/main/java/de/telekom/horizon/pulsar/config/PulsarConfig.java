@@ -12,6 +12,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class PulsarConfig {
 
+    @Value("${pulsar.shutdownWaitTimeSeconds:15}")
+    private int shutdownWaitTimeSeconds;
+
     @Value("${pulsar.features.subscriberCheck:true}")
     private boolean enableSubscriberCheck;
 

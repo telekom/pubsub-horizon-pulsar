@@ -8,13 +8,15 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
-import de.telekom.horizon.pulsar.StopActiveConnectionsEvent;
+import de.telekom.horizon.pulsar.StopPulsarEvent;
+import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +31,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class ConnectionCache implements MessageListener<WorkerClaim> {
 
+    private final PulsarConfig config;
+
     // subscriptionId -> SseTask
     private final ConcurrentHashMap<String, SseTask> map = new ConcurrentHashMap<>();
 
@@ -36,7 +40,8 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
 
     private final ITopic<WorkerClaim> workers;
 
-    public ConnectionCache(HazelcastInstance hazelcastInstance) {
+    public ConnectionCache(PulsarConfig config, HazelcastInstance hazelcastInstance) {
+        this.config = config;
         this.workerId = hazelcastInstance.getCluster().getLocalMember().getUuid();
         this.workers = hazelcastInstance.getTopic("workers");
         workers.addMessageListener(this);
@@ -93,9 +98,22 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
         terminateConnection(map.put(subscriptionId, connection));
     }
 
+    /**
+     * Handles the requested termination of Horizon Pulsar
+     * by waiting some time to ensure the pod has been deregistered in the load balancer
+     * before terminating all connections.
+     * config.getShutdownWaitTimeSeconds() shut match spring's timeout-per-shutdown-phase property
+     */
     @EventListener
-    public void handleHorizonPreStopEvent(StopActiveConnectionsEvent event) {
-        log.info(event.getMessage());
+    public void onStopPulsarEvent(StopPulsarEvent event) {
+        log.warn("Terminating all connections in {} seconds. Reason: {}", config.getShutdownWaitTimeSeconds(), event.getMessage());
+        // wait for some time, so that requests can be processed while the pod is still registered in the load balancer
+        try {
+            Thread.sleep(Instant.ofEpochSecond(config.getShutdownWaitTimeSeconds()).toEpochMilli());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         terminateAllConnections();
     }
 }

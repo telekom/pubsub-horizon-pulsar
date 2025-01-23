@@ -10,7 +10,7 @@ spring:
     name: Horizon Pulsar
 
   lifecycle:
-    timeout-per-shutdown-phase: 10s
+    timeout-per-shutdown-phase: 15s
 
 server:
   shutdown: graceful

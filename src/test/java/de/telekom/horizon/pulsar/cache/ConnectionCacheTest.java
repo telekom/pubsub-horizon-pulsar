@@ -46,7 +46,7 @@ class ConnectionCacheTest {
         var workers = Mockito.mock(ITopic.class);
         when(hazelcastInstance.getTopic("workers")).thenReturn(workers);
 
-        this.cache = new ConnectionCache(hazelcastInstance);
+        this.cache = new ConnectionCache(MockHelper.pulsarConfig, hazelcastInstance);
     }
 
     @Test
