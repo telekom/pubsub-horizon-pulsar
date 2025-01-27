@@ -9,11 +9,17 @@ import de.telekom.horizon.pulsar.config.PulsarConfig;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 
 
 /**
@@ -32,8 +38,10 @@ public class SseService {
     private final TokenService tokenService;
     private final SseTaskFactory sseTaskFactory;
     private final SubscriberCache subscriberCache;
-    private final PulsarConfig pulsarConfig;
+    private final PulsarConfig config;
     private final ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+    private final ConfigurableApplicationContext context;
+
 
     /**
      * Constructs an instance of {@code SseService}.
@@ -41,18 +49,20 @@ public class SseService {
      * @param tokenService                  The {@link TokenService} for handling token-related operations.
      * @param sseTaskFactory                The {@link SseTaskFactory} for creating Server-Sent Event tasks.
      * @param subscriberCache               The {@link SubscriberCache} for caching subscriber information.
-     * @param pulsarConfig                  The {@link PulsarConfig} for Pulsar-related configuration.
+     * @param config                  The {@link PulsarConfig} for Pulsar-related configuration.
      */
     @Autowired
     public SseService(TokenService tokenService,
                       SseTaskFactory sseTaskFactory,
                       SubscriberCache subscriberCache,
-                      PulsarConfig pulsarConfig) {
+                      PulsarConfig config,
+                      ConfigurableApplicationContext context) {
 
         this.tokenService = tokenService;
         this.sseTaskFactory = sseTaskFactory;
         this.subscriberCache = subscriberCache;
-        this.pulsarConfig = pulsarConfig;
+        this.config = config;
+        this.context = context;
 
         init();
     }
@@ -61,13 +71,12 @@ public class SseService {
      * Initializes the SseService, setting up the thread pool and starting the subscription resource listeners.
      */
     private void init() {
-        this.taskExecutor.setMaxPoolSize(pulsarConfig.getThreadPoolSize());
-        this.taskExecutor.setCorePoolSize(pulsarConfig.getThreadPoolSize());
-        this.taskExecutor.setQueueCapacity(pulsarConfig.getQueueCapacity());
+        this.taskExecutor.setMaxPoolSize(config.getThreadPoolSize());
+        this.taskExecutor.setCorePoolSize(config.getThreadPoolSize());
+        this.taskExecutor.setQueueCapacity(config.getQueueCapacity());
         this.taskExecutor.afterPropertiesSet();
 
     }
-
 
     /**
      * Validates that the subscriberID matches the subscription, throwing an exception if not.
@@ -77,7 +86,7 @@ public class SseService {
      * @throws SubscriberDoesNotMatchSubscriptionException If the subscriberId does not match the subscription.
      */
     public void validateSubscriberIdForSubscription(String environment, String subscriptionId) throws SubscriberDoesNotMatchSubscriptionException {
-        if (pulsarConfig.isEnableSubscriberCheck()) {
+        if (config.isEnableSubscriberCheck()) {
             var subscriberId = tokenService.getSubscriberId();
 
             var oSubscriberId = subscriberCache.getSubscriberId(subscriptionId);
@@ -103,7 +112,7 @@ public class SseService {
 
         taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, offset, streamLimit));
 
-        responseContainer.setReady(pulsarConfig.getSseTimeout());
+        responseContainer.setReady(config.getSseTimeout());
 
         return responseContainer;
     }
@@ -115,5 +124,50 @@ public class SseService {
      */
     public void stopEmittingEvents(String subscriptionId) {
         sseTaskFactory.getConnectionCache().removeConnectionForSubscription(subscriptionId);
+    }
+
+    /**
+     * Handles the requested termination of Horizon Pulsar
+     * by waiting some time (shutdownWaitTimeSeconds) to ensure the pod has been deregistered in the load balancer
+     * before terminating all connections.
+     */
+    @PreDestroy
+    public void stopService() {
+        // graceful shutdown will wait for some time, so that requests can be processed while the pod is still registered in the load balancer
+        gracefulShutdown(() -> {
+            log.warn("Terminating all connections in {} seconds due to application shutdown", config.getShutdownWaitTimeSeconds());
+            sseTaskFactory.getConnectionCache().terminateAllConnections();
+        });
+    }
+
+    /**
+     * Handles the graceful shutdown of the application
+     *
+     * The method checks whether the application's context already has been closed. Depending on the outcome
+     * the shutdown will be handled either as expected or unexpected.
+     *
+     * @param action runnable action to be called before exiting
+     */
+    private void gracefulShutdown(@Nullable Runnable action) {
+        var isContextClosed = context.isClosed();
+
+        if (isContextClosed) {
+            log.warn("MessageListenerContainer stopped. Exiting application in {} seconds...", config.getShutdownWaitTimeSeconds());
+        } else {
+            log.error("MessageListenerContainer stopped unexpectedly. Exiting application in {} seconds...", config.getShutdownWaitTimeSeconds());
+        }
+
+        // wait for some time for ongoing tasks to finish
+        try {
+            Thread.sleep(Instant.ofEpochSecond(config.getShutdownWaitTimeSeconds()).toEpochMilli());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        if (action != null) {
+            action.run();
+        }
+
+        System.exit(SpringApplication.exit(context, () -> isContextClosed ? 0 : 1));
     }
 }
