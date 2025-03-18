@@ -110,6 +110,8 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
             // TODO: these spans get duplicated cause of the vortex latency - will be resolved DHEI-13764
 
             var span = tracingHelper.startSpanFromState("work on state message", state);
+            span.tag("subscriptionId", subscriptionId);
+            span.tag("offsetFeatureEnabled", String.valueOf(StringUtils.isNotEmpty(currentOffset)));
             var spanInScope = tracingHelper.withSpanInScope(span);
 
             var pickSpan = tracingHelper.startScopedDebugSpan("pick subscribed message");
