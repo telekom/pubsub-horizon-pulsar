@@ -11,11 +11,16 @@ import com.hazelcast.topic.MessageListener;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+
+
+
 
 /**
  * Component for managing and caching Server-Sent Events (SSE) connections.
