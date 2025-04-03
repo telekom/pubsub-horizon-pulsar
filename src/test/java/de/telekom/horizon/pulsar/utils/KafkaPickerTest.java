@@ -15,8 +15,10 @@ import de.telekom.eni.pandora.horizon.model.meta.EventRetentionTime;
 import de.telekom.eni.pandora.horizon.mongo.model.MessageStateMongoDocument;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.horizon.pulsar.exception.CouldNotPickMessageException;
+import de.telekom.horizon.pulsar.testutils.HazelcastTestInstance;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -31,6 +33,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(HazelcastTestInstance.class)
 @SpringBootTest
 @Import({MongoTestServerConfiguration.class})
 class KafkaPickerTest extends AbstractIntegrationTest {

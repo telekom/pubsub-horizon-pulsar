@@ -8,9 +8,11 @@ import de.telekom.horizon.pulsar.cache.SubscriberCache;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.service.SseService;
+import de.telekom.horizon.pulsar.testutils.HazelcastTestInstance;
 import de.telekom.horizon.pulsar.utils.AbstractIntegrationTest;
 import de.telekom.horizon.pulsar.utils.MongoTestServerConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,6 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@ExtendWith({HazelcastTestInstance.class})
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({MongoTestServerConfiguration.class})

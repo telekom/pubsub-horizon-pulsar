@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Component
-@Qualifier("wrtest")
 public class ConnectionCache implements MessageListener<WorkerClaim> {
 
     // subscriptionId -> SseTask
