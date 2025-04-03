@@ -11,6 +11,7 @@ import com.hazelcast.topic.MessageListener;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -25,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Component
+@Qualifier("wrtest")
 public class ConnectionCache implements MessageListener<WorkerClaim> {
 
     // subscriptionId -> SseTask
@@ -35,7 +37,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     private final ITopic<WorkerClaim> workers;
 
     public ConnectionCache(HazelcastInstance hazelcastInstance) {
-        this.workerId = hazelcastInstance.getCluster().getLocalMember().getUuid();
+        this.workerId = hazelcastInstance.getLocalEndpoint().getUuid();
         this.workers = hazelcastInstance.getTopic("workers");
         workers.addMessageListener(this);
     }
