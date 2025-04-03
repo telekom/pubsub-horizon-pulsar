@@ -99,13 +99,11 @@ public class SseService {
      * @return                    The {@link SseTaskStateContainer} representing the state of the emitted events.
      */
     public SseTaskStateContainer startEmittingEvents(String environment, String subscriptionId, String contentType, boolean includeHttpHeaders, String offset, StreamLimit streamLimit) {
-        log.info("Start startEmittingEvents");
         var responseContainer = new SseTaskStateContainer();
 
         taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, offset, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
-        log.info("End startEmittingEvents");
         return responseContainer;
     }
 

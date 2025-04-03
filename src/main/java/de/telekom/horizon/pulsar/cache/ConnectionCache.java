@@ -43,7 +43,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     public ConnectionCache(HazelcastInstance hazelcastInstance) {
         this.workerId = hazelcastInstance.getLocalEndpoint().getUuid();
         this.workers = hazelcastInstance.getTopic("workers");
-        workers.addMessageListener(this);
+        this.workers.addMessageListener(this);
     }
 
     @Override
