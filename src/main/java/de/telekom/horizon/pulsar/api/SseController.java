@@ -77,7 +77,7 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxBytes,
                                                             @RequestHeader(value = "Last-Event-ID", required = false) String offset,
                                                             @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
-
+        log.info("Start getSseStream");
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
 
         if (!Objects.equals(APPLICATION_STREAM_JSON_VALUE, accept) && !Objects.equals(MediaType.TEXT_EVENT_STREAM_VALUE, accept)) {

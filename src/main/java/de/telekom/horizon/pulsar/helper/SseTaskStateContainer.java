@@ -40,6 +40,7 @@ public class SseTaskStateContainer {
      */
     @Async
     public void setReady(long timeout) {
+        log.info("Start setReady with timeout=" + timeout);
         var startingTime  = Instant.now();
         try {
             while(!running.get()) {
@@ -47,6 +48,7 @@ public class SseTaskStateContainer {
                     canceled.compareAndExchange(false, true);
 
                     var e = new QueueWaitTimeoutException(String.format(TIMEOUT_MESSAGE, timeout));
+                    log.error("setReady has error=" + e);
 
                     emitter.completeWithError(e);
 
@@ -63,5 +65,6 @@ public class SseTaskStateContainer {
             log.error(e.getMessage(), e);
             Thread.currentThread().interrupt();
         }
+        log.info("End setReady");
     }
 }
