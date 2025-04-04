@@ -40,26 +40,20 @@ public class SseTaskStateContainer {
      */
     @Async
     public void setReady(long timeout) {
-        log.info("setReady start with timeout={}", timeout);
         var startingTime  = Instant.now();
         try {
-            log.info("setReady check running={}", running.get());
             while(!running.get()) {
-                log.info("setReady start while loop");
                 if (startingTime.plusMillis(timeout).isBefore(Instant.now())) {
-                    log.info("setReady Inside if, canceled={}", canceled.get());
                     canceled.compareAndExchange(false, true);
 
                     var e = new QueueWaitTimeoutException(String.format(TIMEOUT_MESSAGE, timeout));
-                    log.error("setReady has error=" + e);
 
                     emitter.completeWithError(e);
 
                     return;
                 }
-                log.info("Loop condition={}", startingTime.plusMillis(timeout).isBefore(Instant.now()));
                 // busy waiting
-                Thread.sleep(4200);
+                Thread.sleep(1000);
             }
         } catch (InterruptedException e) {
             canceled.compareAndExchange(false, true);
@@ -68,6 +62,5 @@ public class SseTaskStateContainer {
             log.error(e.getMessage(), e);
             Thread.currentThread().interrupt();
         }
-        log.info("End setReady");
     }
 }

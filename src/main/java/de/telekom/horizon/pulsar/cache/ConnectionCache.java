@@ -48,7 +48,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
 
     @Override
     public void onMessage(Message<WorkerClaim> workerClaim) {
-        var isLocalMember = workerClaim.getPublishingMember().getUuid().compareTo(workerId) == 0;
+        var isLocalMember = workerClaim.getMessageObject().getWorkerId().compareTo(workerId) == 0;
         if (!isLocalMember) {
             var subscriptionId = workerClaim.getMessageObject().getSubscriptionId();
             removeConnectionForSubscription(subscriptionId);
@@ -82,7 +82,7 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
      * @param connection       The {@link SseTask} representing the connection.
      */
     public void claimConnectionForSubscription(String subscriptionId, SseTask connection) {
-        workers.publish(new WorkerClaim(subscriptionId));
+        workers.publish(new WorkerClaim(subscriptionId, workerId));
         terminateConnection(map.put(subscriptionId, connection));
     }
 }
