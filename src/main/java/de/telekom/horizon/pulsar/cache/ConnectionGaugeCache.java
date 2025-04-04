@@ -69,7 +69,8 @@ public class ConnectionGaugeCache {
      * @return Tags for identifying SSE subscriptions in metrics.
      */
     private Tags buildTagsForSseSubscription(SubscriptionResource resource) {
-        var environment = Optional.ofNullable(resource.getSpec().getEnvironment()).orElse(pulsarConfig.getDefaultEnvironment());
+        var resourceEnvironment = Optional.ofNullable(resource.getSpec().getEnvironment()).orElse("default");
+        var environment = !resourceEnvironment.equals("default") ? resourceEnvironment : pulsarConfig.getDefaultEnvironment();
 
         return Tags.of(
                 TAG_ENVIRONMENT, environment,
