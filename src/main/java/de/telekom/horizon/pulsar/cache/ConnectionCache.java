@@ -8,11 +8,10 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import com.hazelcast.topic.Message;
 import com.hazelcast.topic.MessageListener;
+import de.telekom.horizon.pulsar.exception.CacheInitializationException;
 import de.telekom.horizon.pulsar.helper.WorkerClaim;
 import de.telekom.horizon.pulsar.service.SseTask;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -36,14 +35,19 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
     // subscriptionId -> SseTask
     private final ConcurrentHashMap<String, SseTask> map = new ConcurrentHashMap<>();
 
-    private final UUID workerId;
+    private UUID workerId;
 
-    private final ITopic<WorkerClaim> workers;
+    private ITopic<WorkerClaim> workers;
+
+    private final HazelcastInstance hazelcastInstance;
 
     public ConnectionCache(HazelcastInstance hazelcastInstance) {
-        this.workerId = hazelcastInstance.getLocalEndpoint().getUuid();
-        this.workers = hazelcastInstance.getTopic("workers");
-        this.workers.addMessageListener(this);
+        try {
+            initConnection(hazelcastInstance);
+        } catch (CacheInitializationException e) {
+            log.error("Failed to initialize connection cache: {}", e.getMessage());
+        }
+        this.hazelcastInstance = hazelcastInstance;
     }
 
     @Override
@@ -82,7 +86,23 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
      * @param connection       The {@link SseTask} representing the connection.
      */
     public void claimConnectionForSubscription(String subscriptionId, SseTask connection) {
+        if (workerId == null || workers == null) {
+            initConnection(hazelcastInstance);
+            return;
+        }
         workers.publish(new WorkerClaim(subscriptionId, workerId));
         terminateConnection(map.put(subscriptionId, connection));
+    }
+
+    private void initConnection(HazelcastInstance hazelcastInstance) throws CacheInitializationException {
+        try {
+            workerId = hazelcastInstance.getLocalEndpoint().getUuid();
+            workers = hazelcastInstance.getTopic("workers");
+            workers.addMessageListener(this);
+        } catch (Exception e) {
+            log.warn("Failed to instantiate Hazelcast: {}", e.getMessage());
+            throw new CacheInitializationException(e);
+        }
+
     }
 }

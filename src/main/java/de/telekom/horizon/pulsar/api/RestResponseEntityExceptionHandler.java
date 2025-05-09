@@ -36,9 +36,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionHandler {
 
     public static final String HORIZON_ERROR_HANDLING_URL = "https://developer.telekom.de/docs/src/tardis_customer_handbook/horizon/#error-handling";
+
     public static final String DEFAULT_ERROR_TITLE = "Something went wrong.";
 
     public static final String TASK_NOT_STARTED_ERROR_TITLE = "Service is temporarily unable to process the request due to too many active connections. Please retry.  If this happens too often, please contact the support.";
+
+    public static final String CACHE_INITIALIZATION_ERROR_TITLE = "Cache initialization failed. Please try again later.";
 
     private final ApplicationContext applicationContext;
 
@@ -125,6 +128,20 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     })
     protected void handleClientAbortException(Exception e, WebRequest request) {
         log.debug("Error occurred: " + e.getMessage(), e);
+    }
+
+    /**
+     * Handles exceptions related to cache initialization.
+     *
+     * @param e       The exception.
+     * @param request The web request.
+     */
+    @ExceptionHandler(value = {
+            CacheInitializationException.class,
+    })
+    protected ResponseEntity<Object> handleCacheInitializationException(Exception e, WebRequest request) {
+        log.error("Could not initialize cache connection: " + e.getMessage(), e);
+        return responseEntityForException(e, HttpStatus.INTERNAL_SERVER_ERROR, CACHE_INITIALIZATION_ERROR_TITLE, request, null);
     }
 
     /**
