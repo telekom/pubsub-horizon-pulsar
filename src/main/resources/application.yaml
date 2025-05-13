@@ -68,7 +68,10 @@ horizon:
       enabled: ${PULSAR_KAFKA_COMPRESSION_ENABLED:false}
       type: ${PULSAR_KAFKA_COMPRESSION_TYPE:none}
   mongo:
-    enabled: true
+    enabled: ${HORIZON_MONGO_ENABLED:true}
+    url: ${HORIZON_MONGO_URI:mongodb://root:root@localhost:27017}
+    database: ${HORIZON_MONGO_DATABASE:horizon-config}
+    collection: ${HORIZON_MONGO_COLLECTION:eventSubscriptions}
 
 pandora:
   tracing:
