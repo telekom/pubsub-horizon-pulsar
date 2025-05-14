@@ -58,7 +58,6 @@ horizon:
     deDuplication:
       enabled: ${PULSAR_CACHE_DE_DUPLICATION_ENABLED:true}
       defaultCacheName: pulsar-deduplication
-
   kafka:
     bootstrapServers: ${PULSAR_KAFKA_BROKERS:kafka:9092}
     partitionCount: ${PULSAR_KAFKA_PARTITION_COUNT:10}
@@ -70,11 +69,11 @@ horizon:
       enabled: ${PULSAR_KAFKA_COMPRESSION_ENABLED:false}
       type: ${PULSAR_KAFKA_COMPRESSION_TYPE:none}
   mongo:
-    enabled: ${HORIZON_MONGO_ENABLED:true}
-    url: ${HORIZON_MONGO_URL:mongodb://root:root@localhost:27017}
-    database: ${HORIZON_MONGO_DATABASE:horizon}
-    databaseConfig: ${HORIZON_MONGO_DATABASE_CONFIG:horizon-config}
-    collection: ${HORIZON_MONGO_COLLECTION:eventSubscriptions}
+    enabled: ${PULSAR_MONGO_ENABLED:true}
+    url: ${PULSAR_MONGO_URL:mongodb://root:root@localhost:27017}
+    database: ${PULSAR_MONGO_DATABASE:horizon}
+    databaseConfig: ${PULSAR_MONGO_DATABASE_CONFIG:horizon-config}
+    collection: ${PULSAR_MONGO_COLLECTION:eventSubscriptions}
     rethrowExceptions: true
 
 pandora:
