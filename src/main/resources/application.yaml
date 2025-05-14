@@ -72,8 +72,9 @@ horizon:
   mongo:
     enabled: ${HORIZON_MONGO_ENABLED:true}
     url: ${HORIZON_MONGO_URL:mongodb://root:root@localhost:27017}
-    database: ${HORIZON_MONGO_DATABASE:horizon-config}
+    database: ${HORIZON_MONGO_DATABASE:horizon}
     collection: ${HORIZON_MONGO_COLLECTION:eventSubscriptions}
+    rethrowExceptions: true
 
 pandora:
   tracing:
