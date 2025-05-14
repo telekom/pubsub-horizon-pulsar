@@ -73,6 +73,7 @@ horizon:
     enabled: ${HORIZON_MONGO_ENABLED:true}
     url: ${HORIZON_MONGO_URL:mongodb://root:root@localhost:27017}
     database: ${HORIZON_MONGO_DATABASE:horizon}
+    databaseConfig: ${HORIZON_MONGO_DATABASE_CONFIG:horizon-config}
     collection: ${HORIZON_MONGO_COLLECTION:eventSubscriptions}
     rethrowExceptions: true
 
