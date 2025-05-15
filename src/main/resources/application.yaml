@@ -72,8 +72,8 @@ horizon:
     enabled: ${PULSAR_MONGO_ENABLED:true}
     url: ${PULSAR_MONGO_URL:mongodb://root:root@localhost:27017}
     databases:
-      configTimeDatabase: ${HORIZON_MONGO_CONFIG_DATABASE:horizon-config}
-      runTimeDatabase: ${HORIZON_MONGO_RUNTIME_DATABASE:horizon}
+      configTimeDatabase: ${PULSAR_MONGO_CONFIG_DATABASE:horizon-config}
+      runTimeDatabase: ${PULSAR_MONGO_RUNTIME_DATABASE:horizon}
     collection: ${PULSAR_MONGO_COLLECTION:eventSubscriptions}
     rethrowExceptions: true
 
