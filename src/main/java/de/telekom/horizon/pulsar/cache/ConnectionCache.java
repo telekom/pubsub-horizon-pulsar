@@ -4,6 +4,7 @@
 
 package de.telekom.horizon.pulsar.cache;
 
+import com.hazelcast.client.HazelcastClientOfflineException;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import com.hazelcast.topic.Message;
@@ -90,8 +91,13 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
             initConnection(hazelcastInstance);
             return;
         }
-        workers.publish(new WorkerClaim(subscriptionId, workerId));
-        terminateConnection(map.put(subscriptionId, connection));
+        try {
+            workers.publish(new WorkerClaim(subscriptionId, workerId));
+            terminateConnection(map.put(subscriptionId, connection));
+        } catch (HazelcastClientOfflineException e) {
+            log.warn("Failed to claim connection for subscriptionId: {}, errorMessage: {}", subscriptionId, e.getMessage());
+            throw new CacheInitializationException(e);
+        }
     }
 
     private void initConnection(HazelcastInstance hazelcastInstance) throws CacheInitializationException {
@@ -103,6 +109,5 @@ public class ConnectionCache implements MessageListener<WorkerClaim> {
             log.warn("Failed to instantiate Hazelcast: {}", e.getMessage());
             throw new CacheInitializationException(e);
         }
-
     }
 }
