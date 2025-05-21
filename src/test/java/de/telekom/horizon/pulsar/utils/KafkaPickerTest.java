@@ -13,10 +13,11 @@ import de.telekom.eni.pandora.horizon.model.event.Status;
 import de.telekom.eni.pandora.horizon.model.event.SubscriptionEventMessage;
 import de.telekom.eni.pandora.horizon.model.meta.EventRetentionTime;
 import de.telekom.eni.pandora.horizon.mongo.model.MessageStateMongoDocument;
-import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.horizon.pulsar.exception.CouldNotPickMessageException;
+import de.telekom.horizon.pulsar.testutils.HazelcastTestInstance;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -31,12 +32,10 @@ import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(HazelcastTestInstance.class)
 @SpringBootTest
 @Import({MongoTestServerConfiguration.class})
 class KafkaPickerTest extends AbstractIntegrationTest {
-
-    @Autowired
-    private MessageStateMongoRepo mongoRepo;
 
     @Autowired
     private EventWriter eventWriter;
@@ -102,6 +101,6 @@ class KafkaPickerTest extends AbstractIntegrationTest {
         state.setSubscriptionId(subscriptionId);
         state.setCoordinates(subscribed.getRecordMetadata().partition(), subscribed.getRecordMetadata().offset());
 
-        return mongoRepo.save(state);
+        return state;
     }
 }

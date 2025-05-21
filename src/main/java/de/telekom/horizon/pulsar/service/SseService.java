@@ -104,7 +104,6 @@ public class SseService {
         taskExecutor.submit(sseTaskFactory.createNew(environment, subscriptionId, contentType, responseContainer, includeHttpHeaders, offset, streamLimit));
 
         responseContainer.setReady(pulsarConfig.getSseTimeout());
-
         return responseContainer;
     }
 

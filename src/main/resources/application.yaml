@@ -26,6 +26,11 @@ management:
       show-details: always
     shutdown:
       enabled: true
+  health:
+    hazelcast:
+      enabled: false
+    mongo:
+      enabled: false
   zipkin:
     tracing:
       endpoint: ${JAEGER_COLLECTOR_URL:http://jaeger-collector.example.com:9411}
@@ -49,11 +54,10 @@ pulsar:
 horizon:
   cache:
     enabled: true
-    kubernetesServiceDns: ${PULSAR_CACHE_SERVICE_DNS:horizon-quasar-discovery-headless.integration.svc.cluster.local}
+    kubernetesServiceDns: ${PULSAR_CACHE_SERVICE_DNS:localhost:5701}
     deDuplication:
       enabled: ${PULSAR_CACHE_DE_DUPLICATION_ENABLED:true}
       defaultCacheName: pulsar-deduplication
-
   kafka:
     bootstrapServers: ${PULSAR_KAFKA_BROKERS:kafka:9092}
     partitionCount: ${PULSAR_KAFKA_PARTITION_COUNT:10}
@@ -65,7 +69,13 @@ horizon:
       enabled: ${PULSAR_KAFKA_COMPRESSION_ENABLED:false}
       type: ${PULSAR_KAFKA_COMPRESSION_TYPE:none}
   mongo:
-    enabled: true
+    enabled: ${PULSAR_MONGO_ENABLED:true}
+    url: ${PULSAR_MONGO_URL:mongodb://root:root@localhost:27017}
+    databases:
+      configTimeDatabase: ${PULSAR_MONGO_CONFIG_DATABASE:horizon-config}
+      runTimeDatabase: ${PULSAR_MONGO_RUNTIME_DATABASE:horizon}
+    collection: ${PULSAR_MONGO_COLLECTION:eventSubscriptions}
+    rethrowExceptions: true
 
 pandora:
   tracing:

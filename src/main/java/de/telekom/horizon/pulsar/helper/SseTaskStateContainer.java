@@ -52,7 +52,6 @@ public class SseTaskStateContainer {
 
                     return;
                 }
-
                 // busy waiting
                 Thread.sleep(1000);
             }

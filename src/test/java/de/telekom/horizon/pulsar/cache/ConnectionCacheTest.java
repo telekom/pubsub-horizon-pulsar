@@ -4,8 +4,7 @@
 
 package de.telekom.horizon.pulsar.cache;
 
-import com.hazelcast.cluster.Cluster;
-import com.hazelcast.cluster.Member;
+import com.hazelcast.cluster.Endpoint;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
 import de.telekom.horizon.pulsar.service.SseTask;
@@ -36,12 +35,10 @@ class ConnectionCacheTest {
     void setupSseServiceTest() {
         MockHelper.init();
 
-        var cluster = Mockito.mock(Cluster.class);
-        var member = Mockito.mock(Member.class);
+        var endpoint = Mockito.mock(Endpoint.class);
 
-        when(hazelcastInstance.getCluster()).thenReturn(cluster);
-        when(cluster.getLocalMember()).thenReturn(member);
-        when(member.getUuid()).thenReturn(UUID.fromString("477bf3c9-ef1f-41de-9574-419a2ab61131"));
+        when(hazelcastInstance.getLocalEndpoint()).thenReturn(endpoint);
+        when(endpoint.getUuid()).thenReturn(UUID.fromString("477bf3c9-ef1f-41de-9574-419a2ab61131"));
 
         var workers = Mockito.mock(ITopic.class);
         when(hazelcastInstance.getTopic("workers")).thenReturn(workers);
