@@ -177,6 +177,7 @@ public class SseTask implements Runnable {
      */
     public void terminate() {
         isCutOut.compareAndExchange(false, true);
+        flushStatusUpdates(true);
     }
 
     /**
@@ -355,18 +356,23 @@ public class SseTask implements Runnable {
 
             terminate();
         } finally {
-            if (mongoUpdateBatch.getSize() >= pulsarConfig.getSseBatchSize()) {
-                var flushSpan = tracingHelper.startScopedSpan("flush event updates");
-                try {
-                    mongoUpdateBatch.flush();
-                } catch (MongoException e) {
-                    log.error("Error occurred while updating the event status of events for {}: {}", eventMessageSupplier.getSubscriptionId(), e.getMessage(), e);
-                } finally {
-                    flushSpan.finish();
-                }
-            }
+            flushStatusUpdates(false);
 
             sendSpan.finish();
+        }
+    }
+
+    private void flushStatusUpdates(boolean force) {
+        var thresholdReached = mongoUpdateBatch.getSize() >= pulsarConfig.getSseBatchSize();
+        if (thresholdReached || force) {
+            var flushSpan = tracingHelper.startScopedSpan("flush event updates");
+            try {
+                mongoUpdateBatch.flush();
+            } catch (MongoException e) {
+                log.error("Error occurred while updating the event status of events for {}: {}", eventMessageSupplier.getSubscriptionId(), e.getMessage(), e);
+            } finally {
+                flushSpan.finish();
+            }
         }
     }
 
