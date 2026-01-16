@@ -6,6 +6,8 @@ package de.telekom.horizon.pulsar.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.MongoException;
+import com.mongodb.client.MongoCollection;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
 import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
@@ -22,11 +24,13 @@ import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseResponseWrapper;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
+import de.telekom.horizon.pulsar.mongo.MongoUpdateBatch;
 import io.micrometer.core.instrument.Tags;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
+import org.bson.Document;
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
@@ -81,6 +85,7 @@ public class SseTask implements Runnable {
     private final AtomicBoolean isCutOut = new AtomicBoolean(false);
     private final AtomicBoolean isEmitterCompleted = new AtomicBoolean(false);
 
+    private final MongoUpdateBatch mongoUpdateBatch;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -94,7 +99,8 @@ public class SseTask implements Runnable {
     public SseTask(SseTaskStateContainer sseTaskStateContainer,
                    EventMessageSupplier eventMessageSupplier,
                    AtomicInteger openConnectionGaugeValue,
-                   SseTaskFactory factory) {
+                   SseTaskFactory factory,
+                   MongoCollection<Document> collection) {
 
         this.sseTaskStateContainer = sseTaskStateContainer;
         this.eventMessageSupplier = eventMessageSupplier;
@@ -105,6 +111,7 @@ public class SseTask implements Runnable {
         this.deDuplicationService = factory.getDeDuplicationService();
         this.tracingHelper = factory.getTracingHelper();
         this.metricsHelper = factory.getMetricsHelper();
+        this.mongoUpdateBatch = new MongoUpdateBatch(eventMessageSupplier.getSubscriptionId(), collection);
     }
 
     /**
@@ -327,7 +334,8 @@ public class SseTask implements Runnable {
 
             sseTaskStateContainer.getEmitter().send(eventJson);
 
-            pushMetadata(msg, Status.DELIVERED, null);
+            //pushMetadata(msg, Status.DELIVERED, null);
+            mongoUpdateBatch.updateStatus(msg, Status.DELIVERED);
 
             bytesConsumed.addAndGet(eventJson.getBytes(StandardCharsets.UTF_8).length);
             numberConsumed.incrementAndGet();
@@ -339,6 +347,7 @@ public class SseTask implements Runnable {
             sendSpan.error(e);
 
             pushMetadata(msg, Status.FAILED, e);
+            mongoUpdateBatch.updateStatus(msg, Status.FAILED);
         } catch (Exception e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
             log.info(err, e);
@@ -346,6 +355,17 @@ public class SseTask implements Runnable {
 
             terminate();
         } finally {
+            if (mongoUpdateBatch.getSize() >= pulsarConfig.getSseBatchSize()) {
+                var flushSpan = tracingHelper.startScopedSpan("flush event updates");
+                try {
+                    mongoUpdateBatch.flush();
+                } catch (MongoException e) {
+                    log.error("Error occurred while updating the event status of events for {}: {}", eventMessageSupplier.getSubscriptionId(), e.getMessage(), e);
+                } finally {
+                    flushSpan.finish();
+                }
+            }
+
             sendSpan.finish();
         }
     }

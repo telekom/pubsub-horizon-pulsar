@@ -4,9 +4,11 @@
 
 package de.telekom.horizon.pulsar.service;
 
+import com.mongodb.client.MongoCollection;
 import de.telekom.eni.pandora.horizon.cache.service.DeDuplicationService;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
 import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
+import de.telekom.eni.pandora.horizon.mongo.config.MongoProperties;
 import de.telekom.eni.pandora.horizon.mongo.repository.MessageStateMongoRepo;
 import de.telekom.eni.pandora.horizon.tracing.HorizonTracer;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
@@ -16,6 +18,7 @@ import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,6 +37,8 @@ public class SseTaskFactory {
     private final ConnectionGaugeCache connectionGaugeCache;
     private final KafkaPicker kafkaPicker;
     private final MessageStateMongoRepo messageStateMongoRepo;
+    private final MongoTemplate mongoTemplate;
+    private final MongoProperties mongoProperties;
     private final DeDuplicationService deDuplicationService;
     private final HorizonTracer tracingHelper;
     private final EventWriter eventWriter;
@@ -58,6 +63,8 @@ public class SseTaskFactory {
             EventWriter eventWriter,
             KafkaPicker kafkaPicker,
             MessageStateMongoRepo messageStateMongoRepo,
+            MongoTemplate mongoTemplate,
+            MongoProperties mongoProperties,
             DeDuplicationService deDuplicationService,
             HorizonMetricsHelper metricsHelper,
             HorizonTracer tracingHelper) {
@@ -66,6 +73,8 @@ public class SseTaskFactory {
         this.connectionGaugeCache = connectionGaugeCache;
         this.kafkaPicker = kafkaPicker;
         this.messageStateMongoRepo = messageStateMongoRepo;
+        this.mongoTemplate = mongoTemplate;
+        this.mongoProperties = mongoProperties;
         this.tracingHelper = tracingHelper;
         this.connectionCache = connectionCache;
         this.deDuplicationService = deDuplicationService;
@@ -89,7 +98,8 @@ public class SseTaskFactory {
         var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, offset, streamLimit);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 
-        var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this);
+        var statusCollection = mongoTemplate.getCollection(mongoProperties.getDatabases().getRunTimeDatabase());
+        var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this, statusCollection);
         task.setContentType(contentType);
 
         connectionCache.claimConnectionForSubscription(subscriptionId, task);
