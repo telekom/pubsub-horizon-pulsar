@@ -347,7 +347,7 @@ public class SseTask implements Runnable {
             log.info(err, e);
             sendSpan.error(e);
 
-            pushMetadata(msg, Status.FAILED, e);
+            //pushMetadata(msg, Status.FAILED, e);
             mongoUpdateBatch.updateStatus(msg, Status.FAILED);
         } catch (Exception e) {
             var err = String.format("Error occurred while emitting the event: %s", e.getMessage());

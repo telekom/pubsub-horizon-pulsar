@@ -46,7 +46,7 @@ public class MongoUpdateBatch {
         );
 
         if (error != null) {
-            updateDocument
+            updateDocument = updateDocument
                     .append("errorType", error.getClass().getName())
                     .append("errorMessage", error.getMessage());
         }
@@ -64,7 +64,7 @@ public class MongoUpdateBatch {
         BulkWriteResult result = collection.bulkWrite(batch);
 
         var latency = start.until(Instant.now(), ChronoUnit.MILLIS);
-        log.debug("Updated {} documents of subscription {} in {}ms", result.getModifiedCount(), subscriptionId, latency);
+        log.debug("Updated {} of {} documents of subscription {} in {}ms", result.getModifiedCount(), batch.size(), subscriptionId, latency);
         batch.clear();
     }
 
