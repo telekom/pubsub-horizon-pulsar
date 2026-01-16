@@ -370,6 +370,7 @@ public class SseTask implements Runnable {
                 mongoUpdateBatch.flush();
             } catch (MongoException e) {
                 log.error("Error occurred while updating the event status of events for {}: {}", eventMessageSupplier.getSubscriptionId(), e.getMessage(), e);
+                throw e;
             } finally {
                 flushSpan.finish();
             }
