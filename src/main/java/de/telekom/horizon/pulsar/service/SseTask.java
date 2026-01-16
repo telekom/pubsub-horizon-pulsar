@@ -22,6 +22,7 @@ import de.telekom.horizon.pulsar.helper.EventMessageContext;
 import de.telekom.horizon.pulsar.helper.SseResponseWrapper;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
+import io.micrometer.core.instrument.Tags;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -281,6 +282,13 @@ public class SseTask implements Runnable {
             String msgUuidOrNull = deDuplicationService.get(msg);
             boolean isDuplicate = Objects.nonNull(msgUuidOrNull);
             if (isDuplicate) {
+                metricsHelper.getRegistry().counter(
+                        "deduplication_hits",
+                        Tags.of(
+                                "subscriptionId", msg.getSubscriptionId()
+                        )
+                ).increment();
+
                 if(Objects.equals(msg.getUuid(), msgUuidOrNull)) {
                     log.debug("Message with id {} was found in the deduplication cache with the same UUID. Message will be ignored, because status will probably set to DELIVERED in the next minutes.", msg.getUuid());
                 } else {
