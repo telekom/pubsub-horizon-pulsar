@@ -42,7 +42,7 @@ public class MongoUpdateBatch {
                 .append("event.id", eventMessage.getEvent().getId());
 
         var updateDocument = new Document()
-                .append("status", status);
+                .append("status", status.name());
 
         if (error != null) {
             updateDocument
