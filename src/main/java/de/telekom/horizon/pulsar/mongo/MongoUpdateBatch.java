@@ -24,7 +24,7 @@ public class MongoUpdateBatch {
 
     private final MongoCollection<Document> collection;
 
-    private final List<WriteModel<Document>> batch;
+    private final List<UpdateOneModel<Document>> batch;
 
     public MongoUpdateBatch(String subscriptionId, MongoCollection<Document> collection) {
         this.subscriptionId = subscriptionId;
@@ -41,8 +41,9 @@ public class MongoUpdateBatch {
                 .append("_id", eventMessage.getUuid())
                 .append("event.id", eventMessage.getEvent().getId());
 
-        var updateDocument = new Document()
-                .append("status", status.name());
+        var updateDocument = new Document("$set", new Document()
+                .append("status", status.name())
+        );
 
         if (error != null) {
             updateDocument
@@ -57,6 +58,8 @@ public class MongoUpdateBatch {
     }
 
     public void flush() throws MongoException {
+        if (batch.isEmpty()) return;
+
         Instant start = Instant.now();
         BulkWriteResult result = collection.bulkWrite(batch);
 
