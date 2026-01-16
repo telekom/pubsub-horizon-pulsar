@@ -51,7 +51,7 @@ public class MongoUpdateBatch {
                     .append("errorMessage", error.getMessage());
         }
 
-        batch.add(new UpdateOneModel<>(filterDocument, new Document("$set", updateDocument)));
+        batch.add(new UpdateOneModel<>(filterDocument, updateDocument));
         log.debug("Added update to batch: {}", new Document()
                 .append("filter", filterDocument)
                 .append("update", updateDocument).toJson());
