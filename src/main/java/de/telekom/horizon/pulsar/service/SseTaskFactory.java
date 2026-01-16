@@ -18,6 +18,7 @@ import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.utils.KafkaPicker;
 import lombok.Getter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
@@ -63,7 +64,7 @@ public class SseTaskFactory {
             EventWriter eventWriter,
             KafkaPicker kafkaPicker,
             MessageStateMongoRepo messageStateMongoRepo,
-            MongoTemplate mongoTemplate,
+            @Qualifier("mongoStatusTemplate") MongoTemplate mongoTemplate,
             MongoProperties mongoProperties,
             DeDuplicationService deDuplicationService,
             HorizonMetricsHelper metricsHelper,
@@ -98,7 +99,7 @@ public class SseTaskFactory {
         var eventMessageSupplier = new EventMessageSupplier(subscriptionId, this, includeHttpHeaders, offset, streamLimit);
         var connection = connectionGaugeCache.getOrCreateGaugeForSubscription(environment, subscriptionId);
 
-        var statusCollection = mongoTemplate.getCollection(mongoProperties.getDatabases().getRunTimeDatabase());
+        var statusCollection = mongoTemplate.getCollection("status");
         var task = new SseTask(sseTaskStateContainer, eventMessageSupplier, connection, this, statusCollection);
         task.setContentType(contentType);
 
