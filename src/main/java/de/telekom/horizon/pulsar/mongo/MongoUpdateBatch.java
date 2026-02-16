@@ -17,6 +17,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @TODO The batch isn't locked, so it can be used by multiple threads.
+ * @TODO The batch should also be flushed as soon as no more records are returned by the database.
+ */
+
 @Slf4j
 public class MongoUpdateBatch {
 
