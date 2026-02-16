@@ -1,3 +1,7 @@
+// Copyright 2026 Deutsche Telekom IT GmbH
+//
+// SPDX-License-Identifier: Apache-2.0
+
 package de.telekom.horizon.pulsar.mongo;
 
 import com.mongodb.MongoException;
