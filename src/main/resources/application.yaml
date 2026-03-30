@@ -8,6 +8,11 @@ spring:
       request-timeout: -1
   application:
     name: Horizon Pulsar
+  lifecycle:
+    timeout-per-shutdown-phase: ${PULSAR_GRACEFUL_SHUTDOWN_TIMEOUT:60000}ms
+
+server:
+  shutdown: graceful
 
 logging:
   level:
