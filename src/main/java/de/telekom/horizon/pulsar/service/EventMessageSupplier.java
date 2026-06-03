@@ -28,6 +28,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.common.errors.CorruptRecordException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -43,7 +44,7 @@ import java.util.function.Supplier;
 
 /**
  * Supplier for providing {@link EventMessageContext} instances.
- *
+ * <p>
  * This class, annotated with {@code @Slf4j}, serves as a Supplier for generating instances
  * of {@link EventMessageContext}. It is designed to work in conjunction with a Pulsar
  * messaging system, KafkaPicker, and other components to fetch and process messages for a
@@ -74,7 +75,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
      * @param subscriptionId     The subscriptionId for which messages are fetched.
      * @param factory            The {@link SseTaskFactory} used for obtaining related components.
      * @param includeHttpHeaders Boolean flag indicating whether to include HTTP headers in the generated {@code EventMessageContext}.
-     * @param startingOffset             Enables offset based streaming. Specifies the offset (message id) of the last received event message.
+     * @param startingOffset     Enables offset based streaming. Specifies the offset (message id) of the last received event message.
      * @param streamLimit        The {@link StreamLimit} represents any customer specific conditions for terminating the stream early.
      */
     public EventMessageSupplier(String subscriptionId, SseTaskFactory factory, boolean includeHttpHeaders, String startingOffset, StreamLimit streamLimit) {
@@ -92,7 +93,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
     /**
      * Gets the next available {@code EventMessageContext} from the supplier.
-     *
+     * <p>
      * This method polls for message states, picks subscribed messages, and handles exceptions
      * accordingly. It also involves tracing spans and maintains a queue of message states for
      * efficient processing.
@@ -153,12 +154,24 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         var currentSpan = Optional.ofNullable(tracingHelper.getCurrentSpan());
         currentSpan.ifPresent(s -> s.error(e));
 
-        if (e.getCause() instanceof CouldNotFindEventMessageException || e instanceof SubscriberDoesNotMatchSubscriptionException) {
+        var cause = e.getCause();
+        if (
+                cause instanceof CouldNotFindEventMessageException ||
+                        e instanceof SubscriberDoesNotMatchSubscriptionException ||
+                        cause instanceof CorruptRecordException ||
+                        cause instanceof IllegalArgumentException
+        ) {
             try {
                 var status = Status.FAILED;
                 var statusMessage = new StatusMessage(state.getUuid(), state.getEvent().getId(), status, state.getDeliveryType());
-                eventWriter.send(Objects.requireNonNullElse(state.getEventRetentionTime(), EventRetentionTime.DEFAULT).getTopic(),statusMessage, tracingHelper);
-                currentSpan.ifPresent(s -> tracingHelper.addTagsToSpan(s, List.of(Pair.of("status", status.name()))));
+                statusMessage.withThrowable(Optional.ofNullable(e.getCause()).orElse(e));
+                eventWriter.send(Objects.requireNonNullElse(state.getEventRetentionTime(), EventRetentionTime.DEFAULT).getTopic(), statusMessage, tracingHelper);
+                currentSpan.ifPresent(s -> {
+                    tracingHelper.addTagsToSpan(s, List.of(
+                            Pair.of("status", status.name()),
+                            Pair.of("error", Optional.ofNullable(e.getCause()).orElse(e).getMessage())
+                    ));
+                });
             } catch (Exception e1) {
                 var err = String.format("Error occurred while updating the event status: %s", e1.getMessage());
                 log.error(err, e1);
@@ -170,7 +183,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
     /**
      * Polls for message states and adds them to the queue.
-     *
+     * <p>
      * This method polls for message states and adds them to the queue. It also involves
      * tracing spans and maintains a queue of message states for efficient processing.
      */
@@ -223,10 +236,10 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
     /**
      * Delays the current thread for the configured amount of time.
-     *
+     * <p>
      * This method delays the current thread for the configured amount of time.
      */
-    private void delay () {
+    private void delay() {
         var pollDelay = pulsarConfig.getSsePollDelay();
 
         if (lastPoll == null || pollDelay <= 0L) {
