@@ -62,7 +62,8 @@ public class WebSecurityConfig {
             http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
                             .requestMatchers(toAnyEndpoint()).permitAll()
                             .requestMatchers(HttpMethod.HEAD, "/v1/**").permitAll()
-                            .requestMatchers( "/v1/**").authenticated())
+                            .requestMatchers("/error").permitAll() // prevent AccessDeniedException when Spring forwards to /error internally
+                            .requestMatchers("/v1/**").authenticated())
                     .oauth2ResourceServer(oauth2 -> oauth2.authenticationManagerResolver(jwtIssuerAuthenticationManagerResolver));
         } else {
             // Allow all requests without authentication if OAuth2 is disabled

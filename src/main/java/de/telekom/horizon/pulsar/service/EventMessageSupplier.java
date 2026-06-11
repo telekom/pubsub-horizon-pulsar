@@ -5,7 +5,6 @@
 package de.telekom.horizon.pulsar.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.telekom.eni.pandora.horizon.kafka.event.EventWriter;
 import de.telekom.eni.pandora.horizon.model.db.State;
@@ -121,17 +120,23 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
 
                 var message = deserializeSubscriptionEventMessage(rec.value(), state);
 
-                if (message != null) {
-                    tracingHelper.addTagsToSpanFromSubscriptionEventMessage(pickSpan, message);
-
-                    // we do a sanity check here that checks whether metadata and event message fit to each other
-                    if (!subscriptionId.equals(message.getSubscriptionId())) {
-                        var errorMessage = String.format("Event message %s did not match subscriptionId %s", state.getUuid(), state.getSubscriptionId());
-                        throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
-                    }
-
-                    Optional.ofNullable(message.getHttpHeaders()).ifPresent(headers -> headers.put("x-pubsub-offset-id", new ArrayList<>(List.of(state.getUuid()))));
+                if (message == null) {
+                    // Deserialization failed — mark as FAILED to prevent infinite re-poll
+                    handleException(state, new CouldNotPickMessageException(
+                            new CouldNotFindEventMessageException("Deserialization failed for event " + state.getUuid())));
+                    return new EventMessageContext(null, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
                 }
+
+                tracingHelper.addTagsToSpanFromSubscriptionEventMessage(pickSpan, message);
+
+                // we do a sanity check here that checks whether metadata and event message fit to each other
+                if (!subscriptionId.equals(message.getSubscriptionId())) {
+                    var errorMessage = String.format("Event message %s did not match subscriptionId %s", state.getUuid(), state.getSubscriptionId());
+                    throw new SubscriberDoesNotMatchSubscriptionException(errorMessage);
+                }
+
+                Optional.ofNullable(message.getHttpHeaders()).ifPresent(headers -> headers.put("x-pubsub-offset-id", new ArrayList<>(List.of(state.getUuid()))));
+
                 return new EventMessageContext(message, includeHttpHeaders, streamLimit, ignoreDeduplication, span, spanInScope);
             } catch (CouldNotPickMessageException | SubscriberDoesNotMatchSubscriptionException e) {
                 handleException(state, e);
@@ -161,24 +166,32 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
                         cause instanceof CorruptRecordException ||
                         cause instanceof IllegalArgumentException
         ) {
+            log.warn("Event {} failed permanently — {}: {}",
+                    state.getUuid(),
+                    Optional.ofNullable(cause).orElse(e).getClass().getSimpleName(),
+                    Optional.ofNullable(cause).orElse(e).getMessage());
             try {
                 var status = Status.FAILED;
                 var statusMessage = new StatusMessage(state.getUuid(), state.getEvent().getId(), status, state.getDeliveryType());
                 statusMessage.withThrowable(Optional.ofNullable(e.getCause()).orElse(e));
                 eventWriter.send(Objects.requireNonNullElse(state.getEventRetentionTime(), EventRetentionTime.DEFAULT).getTopic(), statusMessage, tracingHelper);
                 currentSpan.ifPresent(s -> {
+                    var errorSource = Optional.ofNullable(cause).orElse(e);
+                    var errorMsg = errorSource.getMessage() != null
+                            ? errorSource.getMessage() : errorSource.getClass().getSimpleName();
                     tracingHelper.addTagsToSpan(s, List.of(
                             Pair.of("status", status.name()),
-                            Pair.of("error", Optional.ofNullable(e.getCause()).orElse(e).getMessage())
+                            Pair.of("error", errorMsg)
                     ));
                 });
             } catch (Exception e1) {
-                var err = String.format("Error occurred while updating the event status: %s", e1.getMessage());
-                log.error(err, e1);
+                log.error("Failed to write FAILED status for event {} — {}: {}",
+                        state.getUuid(), e1.getClass().getSimpleName(), e1.getMessage(), e1);
             }
+        } else {
+            log.error("Unexpected error picking event {} — {}: {}",
+                    state.getUuid(), e.getClass().getSimpleName(), e.getMessage(), e);
         }
-
-        log.error("Could not pick event, error: {}", e.getMessage());
     }
 
     /**
@@ -191,46 +204,78 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         if (messageStates.isEmpty()) {
             delay();
 
-            Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
-
-            Optional<MessageStateMongoDocument> offsetMsg = Optional.empty();
-            if (StringUtils.isNoneEmpty(currentOffset)) {
-                offsetMsg = messageStateMongoRepo.findById(currentOffset);
-            }
-
-            if (offsetMsg.isPresent()) {
-                var offsetTimestamp = offsetMsg.get().getTimestamp();
-
-                var list = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
-                                DeliveryType.SERVER_SENT_EVENT,
-                                subscriptionId,
-                                offsetTimestamp,
-                                pageable
-                        ).stream()
-                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
-                        .toList();
-
-                messageStates.addAll(list);
-
-                if (!list.isEmpty()) {
-                    currentOffset = list.getLast().getUuid();
+            // Retry on transient MongoDB failures. PrivateLink connection drops cause
+            // IllegalStateException from the driver's connection pool when an in-flight query races
+            // with pool invalidation. The pool recovers within ms, so a single retry with jitter
+            // is enough to survive the blip without killing the customer's SSE stream.
+            // Catches broad Exception because the driver may wrap differently across versions.
+            int retriesLeft = pulsarConfig.getMongoMaxRetries();
+            while (true) {
+                try {
+                    doPollMessageStates();
+                    break;
+                } catch (Exception e) {
+                    if (retriesLeft-- <= 0) throw e;
+                    log.warn("MongoDB poll failed, retrying ({} left) — {}: {}",
+                            retriesLeft, e.getClass().getSimpleName(), e.getMessage());
+                    try {
+                        // Jitter prevents thundering herd when all SSE threads fail simultaneously
+                        long delay = pulsarConfig.getMongoRetryDelayMs();
+                        Thread.sleep(delay / 2 + (long) (Math.random() * delay / 2));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(ie);
+                    }
                 }
-            } else {
-                currentOffset = null;
-
-                var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
-                                List.of(Status.PROCESSED),
-                                DeliveryType.SERVER_SENT_EVENT,
-                                subscriptionId,
-                                pageable
-                        ).stream()
-                        .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
-                        .toList();
-
-                messageStates.addAll(list);
             }
 
             lastPoll = Instant.now();
+        }
+    }
+
+    private void doPollMessageStates() {
+        Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
+
+        Optional<MessageStateMongoDocument> offsetMsg = Optional.empty();
+        if (StringUtils.isNoneEmpty(currentOffset)) {
+            offsetMsg = messageStateMongoRepo.findById(currentOffset);
+        }
+
+        if (offsetMsg.isPresent()) {
+            var offsetTimestamp = offsetMsg.get().getTimestamp();
+
+            var rawList = messageStateMongoRepo.findByDeliveryTypeAndSubscriptionIdAndTimestampGreaterThanAsc(
+                            DeliveryType.SERVER_SENT_EVENT,
+                            subscriptionId,
+                            offsetTimestamp,
+                            pageable
+                    ).stream()
+                    .filter(m -> m.getCoordinates() != null)
+                    .toList();
+
+            // Advance offset past all returned results (including FAILED) to avoid re-polling the same batch
+            if (!rawList.isEmpty()) {
+                currentOffset = rawList.getLast().getUuid();
+            }
+
+            var list = rawList.stream()
+                    .filter(m -> m.getStatus() != Status.FAILED)
+                    .toList();
+
+            messageStates.addAll(list);
+        } else {
+            currentOffset = null;
+
+            var list = messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                            List.of(Status.PROCESSED),
+                            DeliveryType.SERVER_SENT_EVENT,
+                            subscriptionId,
+                            pageable
+                    ).stream()
+                    .filter(m -> m.getCoordinates() != null) // we skip messages that refer to -1 partitions and offsets
+                    .toList();
+
+            messageStates.addAll(list);
         }
     }
 
@@ -250,7 +295,7 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         try {
             Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
-            log.error(e.getMessage(), e);
+            log.debug("Poll delay interrupted");
             Thread.currentThread().interrupt();
         }
     }
@@ -265,10 +310,9 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
     private SubscriptionEventMessage deserializeSubscriptionEventMessage(String json, State state) {
         try {
             return objectMapper.readValue(json, SubscriptionEventMessage.class);
-        } catch (JsonMappingException e) {
-            log.error("Could not deserialize (map) json for state {}", state);
         } catch (JsonProcessingException e) {
-            log.error("Could not deserialize (process) json for state {}", state);
+            log.error("Failed to deserialize event {} — {}: {}",
+                    state.getUuid(), e.getClass().getSimpleName(), e.getMessage(), e);
         }
         return null;
     }
