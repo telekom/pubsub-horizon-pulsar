@@ -118,6 +118,13 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     })
     @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
     protected ResponseEntity<Object> handleTimeout(Exception e, WebRequest request) {
+        // SSE streams commit the response immediately (200 + flush). When idle timeout fires,
+        // the response is already committed so we can't change it to 504 — just log and return.
+        if (request instanceof org.springframework.web.context.request.ServletWebRequest swr
+                && swr.getResponse() != null && swr.getResponse().isCommitted()) {
+            log.info("SSE idle timeout — response already committed");
+            return null;
+        }
         return responseEntityForException(e, HttpStatus.GATEWAY_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT.getReasonPhrase(), request, null);
     }
 

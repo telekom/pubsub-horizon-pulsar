@@ -31,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
@@ -488,5 +489,30 @@ class SseTaskTest {
         verify(MockHelper.openConnectionGaugeValue, times(1)).getAndSet(0);
         // Verify that for each emitted event a de-duplication entry will be written
         verify(MockHelper.deDuplicationService, times(itemQueueInitialSize)).track(any());
+    }
+
+    @Test
+    void testMdcSubscriptionIdSetDuringExecution() {
+        when(sseTaskStateContainerMock.getCanceled()).thenReturn(new AtomicBoolean(false));
+        when(sseTaskStateContainerMock.getRunning()).thenReturn(new AtomicBoolean(false));
+
+        var emitterMock = mock(ResponseBodyEmitter.class);
+        when(sseTaskStateContainerMock.getEmitter()).thenReturn(emitterMock);
+
+        when(eventMessageSupplierMock.getSubscriptionId()).thenReturn(MockHelper.TEST_SUBSCRIPTION_ID);
+
+        var mdcCaptured = new AtomicBoolean(false);
+        when(eventMessageSupplierMock.get()).thenAnswer(i -> {
+            assertEquals(MockHelper.TEST_SUBSCRIPTION_ID, MDC.get("subscriptionId"));
+            mdcCaptured.set(true);
+            return new EventMessageContext();
+        });
+
+        when(MockHelper.pulsarConfig.getSseTimeout()).thenReturn(100L);
+
+        sseTaskSpy.run();
+
+        assertTrue(mdcCaptured.get(), "MDC subscriptionId should have been verified during execution");
+        assertNull(MDC.get("subscriptionId"), "MDC must be cleaned after run()");
     }
 }

@@ -26,6 +26,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
@@ -134,31 +135,38 @@ public class SseTask implements Runnable {
      */
     @Override
     public void run() {
-        var stream = createStreamTopology(eventMessageSupplier);
+        // MDC ensures subscriptionId appears in every log line from this thread (via LogstashEncoder)
+        // including Spring Data and driver-level logs, without needing explicit parameters.
+        MDC.put("subscriptionId", eventMessageSupplier.getSubscriptionId());
+        try {
+            if (sseTaskStateContainer.getCanceled().get()) {
+                return;
+            }
 
-        if (sseTaskStateContainer.getCanceled().get()) {
-            return;
-        }
+            var stream = createStreamTopology(eventMessageSupplier);
 
-        // Monitor the status of the emitter completion.
-        sseTaskStateContainer.getEmitter().onCompletion(() -> isEmitterCompleted.compareAndExchange(false, true));
-        sseTaskStateContainer.getEmitter().onError(e -> isEmitterCompleted.compareAndExchange(false, true));
+            // Monitor the status of the emitter completion.
+            sseTaskStateContainer.getEmitter().onCompletion(() -> isEmitterCompleted.compareAndExchange(false, true));
+            sseTaskStateContainer.getEmitter().onError(e -> isEmitterCompleted.compareAndExchange(false, true));
 
-        startTime = Instant.now();
+            startTime = Instant.now();
+            log.info("SSE stream started");
 
-        // Mark the task as running and increment the open connection gauge value.
-        sseTaskStateContainer.getRunning().compareAndExchange(false, true);
-        openConnectionGaugeValue.getAndSet(1);
+            // Mark the task as running and increment the open connection gauge value.
+            sseTaskStateContainer.getRunning().compareAndExchange(false, true);
+            openConnectionGaugeValue.getAndSet(1);
 
-        try (stream){
-            stream.forEach(this::emitEventMessage);
-        } catch (Exception e) {
-            log.error(String.format("Error occurred: %s", e.getMessage()), e);
-
-            sseTaskStateContainer.getEmitter().completeWithError(e);
+            try (stream) {
+                stream.forEach(this::emitEventMessage);
+            } catch (Exception e) {
+                log.error("SSE stream failed — {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+                sseTaskStateContainer.getEmitter().completeWithError(e);
+            } finally {
+                openConnectionGaugeValue.getAndSet(0);
+                stopTime = Instant.now();
+            }
         } finally {
-            openConnectionGaugeValue.getAndSet(0);
-            stopTime = Instant.now();
+            MDC.remove("subscriptionId");
         }
     }
 
@@ -183,12 +191,14 @@ public class SseTask implements Runnable {
      */
     private boolean applyStreamEndFilter(EventMessageContext context) {
         if (isEmitterCompleted.get()) {
+            log.info("SSE stream ending — client disconnected");
             context.finishSpan();
 
             return false;
         }
 
         if (isCutOut.get()) {
+            log.info("SSE stream ending — connection cut out");
             sseTaskStateContainer.getEmitter().completeWithError(new ConnectionCutOutException());
             context.finishSpan();
 
@@ -202,6 +212,7 @@ public class SseTask implements Runnable {
             final boolean maxBytesExceeded = streamLimit.getMaxBytes() > 0 && bytesConsumed.get() >= streamLimit.getMaxBytes();
 
             if (maxNumberExceeded || maxMinutesExceeded || maxBytesExceeded) {
+                log.info("SSE stream ending — stream limit exceeded");
                 sseTaskStateContainer.getEmitter().completeWithError(new StreamLimitExceededException());
                 context.finishSpan();
                 return false;
@@ -226,6 +237,7 @@ public class SseTask implements Runnable {
 
         if (context.getSubscriptionEventMessage() == null) {
             if (lastEventMessage.plusMillis(pulsarConfig.getSseTimeout()).isBefore(now)) {
+                log.info("SSE stream ending — idle timeout ({}ms)", pulsarConfig.getSseTimeout());
                 sseTaskStateContainer.getEmitter().completeWithError(new ConnectionTimeoutException(String.format(TIMEOUT_MESSAGE, pulsarConfig.getSseTimeout())));
                 context.finishSpan();
 
@@ -326,14 +338,12 @@ public class SseTask implements Runnable {
 
             metricsHelper.getRegistry().counter(METRIC_SENT_SSE_EVENTS, metricsHelper.buildTagsFromSubscriptionEventMessage(msg)).increment();
         } catch (JsonProcessingException e) {
-            var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
-            log.info(err, e);
+            log.warn("Failed to serialize event {} for delivery: {}", msg.getUuid(), e.getMessage(), e);
             sendSpan.error(e);
 
             pushMetadata(msg, Status.FAILED, e);
         } catch (Exception e) {
-            var err = String.format("Error occurred while emitting the event: %s", e.getMessage());
-            log.info(err, e);
+            log.warn("SSE emit failed, terminating — {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
             sendSpan.error(e);
 
             terminate();
@@ -373,8 +383,8 @@ public class SseTask implements Runnable {
                 afterSendFuture.thenAccept(result -> deDuplicationService.track(msg));
             }
         } catch (Exception e) {
-            var err = String.format("Error occurred while updating the event status: %s", e.getMessage());
-            log.error(err, e);
+            log.error("Failed to push status {} for event {} — {}: {}",
+                    status, msg.getUuid(), e.getClass().getSimpleName(), e.getMessage(), e);
             trackSpan.error(e);
         } finally {
             trackSpan.finish();

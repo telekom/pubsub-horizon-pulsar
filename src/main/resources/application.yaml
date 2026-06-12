@@ -55,6 +55,9 @@ pulsar:
     issuerUrls: ${PULSAR_ISSUER_URL:http://localhost:8080/auth/realms/default}
     oauth: ${PULSAR_SECURITY_OAUTH:true}
   defaultEnvironment: ${PULSAR_DEFAULT_ENVIRONMENT:integration}
+  mongo:
+    maxRetries: ${PULSAR_MONGO_MAX_RETRIES:1}
+    retryDelayMs: ${PULSAR_MONGO_RETRY_DELAY_MS:100}
 
 horizon:
   cache:

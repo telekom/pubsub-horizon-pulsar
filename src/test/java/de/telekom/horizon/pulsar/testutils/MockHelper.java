@@ -92,6 +92,8 @@ public class MockHelper {
         lenient().when(pulsarConfig.getSsePollDelay()).thenReturn(1000L);
         lenient().when(pulsarConfig.getThreadPoolSize()).thenReturn(100);
         lenient().when(pulsarConfig.getQueueCapacity()).thenReturn(100);
+        lenient().when(pulsarConfig.getMongoMaxRetries()).thenReturn(1);
+        lenient().when(pulsarConfig.getMongoRetryDelayMs()).thenReturn(1L);
 
         kafkaPicker = new KafkaPicker(kafkaTemplate);
         sseTaskFactory = new SseTaskFactory(pulsarConfig, connectionCache, connectionGaugeCache, eventWriter, kafkaPicker, messageStateMongoRepo, deDuplicationService, metricsHelper, tracingHelper);

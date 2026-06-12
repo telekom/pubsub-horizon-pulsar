@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -203,6 +204,78 @@ class EventMessageSupplierTest {
         assertEquals(states.getFirst().getUuid(), statusMessage.getUuid());
         assertEquals(states.getFirst().getEvent().getId(), statusMessage.getEvent().getId());
         assertEquals(Status.FAILED, statusMessage.getStatus());
+    }
+
+    @Test
+    void testPollMessageStatesRetriesOnMongoFailure() {
+        final var objectMapper = new ObjectMapper();
+
+        var states = MockHelper.createMessageStateMongoDocumentsForTesting(
+                MockHelper.pulsarConfig.getSseBatchSize(), MockHelper.TEST_ENVIRONMENT, Status.PROCESSED, false);
+
+        var callCount = new AtomicInteger(0);
+        when(MockHelper.messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                eq(List.of(Status.PROCESSED)),
+                eq(DeliveryType.SERVER_SENT_EVENT),
+                eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                any(Pageable.class)
+        )).thenAnswer(invocation -> {
+            if (callCount.getAndIncrement() == 0) {
+                throw new IllegalStateException("state should be: open");
+            }
+            return new SliceImpl<>(states);
+        });
+
+        var subscriptionEventMessage = MockHelper.createSubscriptionEventMessageForTesting(DeliveryType.SERVER_SENT_EVENT);
+        ConsumerRecord<String, String> record = Mockito.mock(ConsumerRecord.class);
+        try {
+            when(record.value()).thenReturn(objectMapper.writeValueAsString(subscriptionEventMessage));
+        } catch (JsonProcessingException e) {
+            fail(e);
+        }
+
+        when(MockHelper.kafkaTemplate.receive(
+                eq(MockHelper.TEST_TOPIC),
+                eq(states.getFirst().getCoordinates().partition()),
+                eq(states.getFirst().getCoordinates().offset()),
+                eq(Duration.ofMillis(30000))
+        )).thenReturn(record);
+
+        var eventWriterMock = mock(EventWriter.class);
+        ReflectionTestUtils.setField(eventMessageSupplier, "eventWriter", eventWriterMock, EventWriter.class);
+
+        var result = eventMessageSupplier.get();
+        assertNotNull(result);
+        assertNotNull(result.getSubscriptionEventMessage());
+
+        verify(MockHelper.messageStateMongoRepo, times(2))
+                .findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                        eq(List.of(Status.PROCESSED)),
+                        eq(DeliveryType.SERVER_SENT_EVENT),
+                        eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                        any(Pageable.class));
+    }
+
+    @Test
+    void testPollMessageStatesThrowsAfterRetriesExhausted() {
+        when(MockHelper.messageStateMongoRepo.findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                eq(List.of(Status.PROCESSED)),
+                eq(DeliveryType.SERVER_SENT_EVENT),
+                eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                any(Pageable.class)
+        )).thenThrow(new IllegalStateException("state should be: open"));
+
+        var eventWriterMock = mock(EventWriter.class);
+        ReflectionTestUtils.setField(eventMessageSupplier, "eventWriter", eventWriterMock, EventWriter.class);
+
+        assertThrows(IllegalStateException.class, () -> eventMessageSupplier.get());
+
+        verify(MockHelper.messageStateMongoRepo, times(2))
+                .findByStatusInAndDeliveryTypeAndSubscriptionIdAsc(
+                        eq(List.of(Status.PROCESSED)),
+                        eq(DeliveryType.SERVER_SENT_EVENT),
+                        eq(MockHelper.TEST_SUBSCRIPTION_ID),
+                        any(Pageable.class));
     }
 
     @Test

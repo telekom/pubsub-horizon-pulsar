@@ -32,4 +32,10 @@ public class PulsarConfig {
 
     @Value("${pulsar.defaultEnvironment}")
     private String defaultEnvironment;
+
+    @Value("${pulsar.mongo.maxRetries:1}")
+    private int mongoMaxRetries;
+
+    @Value("${pulsar.mongo.retryDelayMs:100}")
+    private long mongoRetryDelayMs;
 }
