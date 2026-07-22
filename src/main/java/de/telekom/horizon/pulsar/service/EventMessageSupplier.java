@@ -178,6 +178,13 @@ public class EventMessageSupplier implements Supplier<EventMessageContext> {
         if (messageStates.isEmpty()) {
             delay();
 
+            // When event delivery is suppressed we skip polling the message states from the
+            // database but still update lastPoll so no CPU busy-loop is created.
+            if (pulsarConfig.isEventDeliverySuppressed()) {
+                lastPoll = Instant.now();
+                return;
+            }
+
             Pageable pageable = PageRequest.of(0, pulsarConfig.getSseBatchSize(), Sort.by(Sort.Direction.ASC, "timestamp"));
 
             Optional<MessageStateMongoDocument> offsetMsg = Optional.empty();

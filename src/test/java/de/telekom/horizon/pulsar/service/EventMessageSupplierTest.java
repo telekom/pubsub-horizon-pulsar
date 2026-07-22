@@ -249,5 +249,20 @@ class EventMessageSupplierTest {
         var m = result.getSubscriptionEventMessage();
         assertNull(m);
     }
+
+    @Test
+    void testGetReturnsEmptyContextWhenEventDeliverySuppressed() {
+        // Enable delivery suppression
+        when(MockHelper.pulsarConfig.isEventDeliverySuppressed()).thenReturn(true);
+
+        var result = eventMessageSupplier.get();
+
+        // Should return an empty context (no event message)
+        assertNull(result.getSubscriptionEventMessage());
+
+        // No downstream components should be queried.
+        verifyNoInteractions(MockHelper.messageStateMongoRepo);
+        verifyNoInteractions(MockHelper.kafkaTemplate);
+    }
 }
 

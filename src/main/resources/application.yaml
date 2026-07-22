@@ -50,6 +50,7 @@ pulsar:
   threadpool-size: ${PULSAR_THREADPOOL_SIZE:100}
   queue-capacity: ${PULSAR_QUEUE_CAPACITY:10000}
   features:
+    eventDeliverySuppressed: ${PULSAR_EVENT_DELIVERY_SUPPRESSED:false}
     subscriberCheck: ${PULSAR_FEATURE_SUBSCRIBER_CHECK:true}
   security:
     issuerUrls: ${PULSAR_ISSUER_URL:http://localhost:8080/auth/realms/default}
