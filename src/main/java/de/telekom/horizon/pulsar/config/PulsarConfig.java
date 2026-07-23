@@ -15,6 +15,9 @@ public class PulsarConfig {
     @Value("${pulsar.features.subscriberCheck:true}")
     private boolean enableSubscriberCheck;
 
+    @Value("${pulsar.features.eventDeliverySuppressed:false}")
+    private boolean eventDeliverySuppressed;
+
     @Value("${pulsar.ssePollDelay:1000}")
     private long ssePollDelay;
 
