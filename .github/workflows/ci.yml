@@ -15,6 +15,7 @@ jobs:
     uses: telekom/pubsub-horizon-ci/.github/workflows/gradle-build.yml@main
     with:
       java-version: "21"
+      init-gradle-path: ".github/assets/init.gradle"
 
   reuse:
     uses: telekom/pubsub-horizon-ci/.github/workflows/reuse-compliance.yml@main
@@ -33,6 +34,7 @@ jobs:
     with:
       component: pulsar
       language: java
+      init-gradle-path: ".github/assets/init.gradle"
       build-args: "DOCKER_BASE_IMAGE=artifactory.devops.telekom.de/tardis-oci-local/tardis/infra/build/pandora-java-21:1.0.0"
     secrets:
       REGISTRY_USERNAME: ${{ secrets.ARTIFACTORY_O28M_PUSH_USER }}
