@@ -23,7 +23,7 @@ SPDX-License-Identifier: Apache-2.0
 <!--
 [![REUSE status](https://api.reuse.software/badge/github.com/telekom/pubsub-horizon-pulsar)](https://api.reuse.software/info/github.com/telekom/pubsub-horizon-pulsar)
 -->
-[![Gradle Build and Test](https://github.com/telekom/pubsub-horizon-pulsar/actions/workflows/gradle-build.yml/badge.svg)](https://github.com/telekom/pubsub-horizon-pulsar/actions/workflows/gradle-build.yml)
+[![CI](https://github.com/telekom/pubsub-horizon-pulsar/actions/workflows/ci.yml/badge.svg)](https://github.com/telekom/pubsub-horizon-pulsar/actions/workflows/ci.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/telekom/pubsub-horizon-pulsar)
 
 ## Overview
