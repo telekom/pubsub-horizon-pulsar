@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: telekom/pubsub-horizon-ci/.github/workflows/gradle-build.yml@main
+    uses: telekom/pubsub-horizon-ci/.github/workflows/gradle-build.yml@temp/permissions
     with:
       java-version: "21"
       init-gradle-path: ".github/assets/init.gradle"
