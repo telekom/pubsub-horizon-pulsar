@@ -39,6 +39,8 @@ repositories {
     mavenCentral()
 }
 
+ext['tomcat.version'] = '10.1.60'
+
 dependencies {
     //Spring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
