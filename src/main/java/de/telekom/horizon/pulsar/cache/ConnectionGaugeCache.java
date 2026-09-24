@@ -4,8 +4,8 @@
 
 package de.telekom.horizon.pulsar.cache;
 
-import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
+import de.telekom.eni.pandora.horizon.cache.service.SubscriptionCacheReader;
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.metrics.HorizonMetricsHelper;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
@@ -32,7 +32,7 @@ public class ConnectionGaugeCache {
 
     private final PulsarConfig pulsarConfig;
 
-    private final JsonCacheService<SubscriptionResource> cache;
+    private final SubscriptionCacheReader cache;
 
     private final ConcurrentHashMap<String, AtomicInteger> metricsCache = new ConcurrentHashMap<>();
 
@@ -45,7 +45,7 @@ public class ConnectionGaugeCache {
      * @param cache          Cache for storing subscription resources.
      * @param metricsHelper  Helper for managing Horizon metrics.
      */
-    public ConnectionGaugeCache(PulsarConfig pulsarConfig, JsonCacheService<SubscriptionResource> cache, HorizonMetricsHelper metricsHelper) {
+    public ConnectionGaugeCache(PulsarConfig pulsarConfig, SubscriptionCacheReader cache, HorizonMetricsHelper metricsHelper) {
         this.pulsarConfig = pulsarConfig;
         this.cache = cache;
         this.metricsHelper = metricsHelper;
@@ -89,9 +89,9 @@ public class ConnectionGaugeCache {
     private AtomicInteger createGaugeForSubscription(String subscriptionId) {
         Optional<SubscriptionResource> oSubscription = Optional.empty();
         try {
-            oSubscription = cache.getByKey(subscriptionId);
-        } catch (JsonCacheException e) {
-            log.error("Error occurred while executing query on JsonCacheService", e);
+            oSubscription = cache.getById(subscriptionId);
+        } catch (SubscriptionCacheReadException e) {
+            log.error("Error occurred while reading subscription cache", e);
         }
 
         Tags tags = Tags.empty();

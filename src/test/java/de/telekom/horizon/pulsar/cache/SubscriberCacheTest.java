@@ -4,8 +4,8 @@
 
 package de.telekom.horizon.pulsar.cache;
 
-import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
+import de.telekom.eni.pandora.horizon.cache.service.SubscriptionCacheReader;
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.Subscription;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResourceSpec;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 class SubscriberCacheTest {
 
     @Mock
-    JsonCacheService<SubscriptionResource> jsonCacheService;
+    SubscriptionCacheReader subscriptionCacheReader;
 
     @Mock
     PulsarConfig pulsarConfig;
@@ -37,12 +37,12 @@ class SubscriberCacheTest {
     void setupSseServiceTest() {
         MockHelper.init();
 
-        this.cache = new SubscriberCache(pulsarConfig, jsonCacheService);
+        this.cache = new SubscriberCache(pulsarConfig, subscriptionCacheReader);
         
     }
 
     @Test
-    void testGet() throws JsonCacheException {
+    void testGet() throws SubscriptionCacheReadException {
         {
             var result = cache.getSubscriberId(MockHelper.TEST_SUBSCRIPTION_ID);
             assertThat(result).isEmpty();
@@ -55,7 +55,7 @@ class SubscriberCacheTest {
         spec.setSubscription(subscription);
         resource.setSpec(spec);
 
-        when(jsonCacheService.getByKey(MockHelper.TEST_SUBSCRIPTION_ID)).thenReturn(Optional.of(resource));
+        when(subscriptionCacheReader.getById(MockHelper.TEST_SUBSCRIPTION_ID)).thenReturn(Optional.of(resource));
 
         // We get the entry that we added before
         {

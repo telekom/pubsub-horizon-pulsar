@@ -4,8 +4,8 @@
 
 package de.telekom.horizon.pulsar.cache;
 
-import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
+import de.telekom.eni.pandora.horizon.cache.service.SubscriptionCacheReader;
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.Subscription;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResourceSpec;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
 class ConnectionGaugeCacheTest {
 
     @Mock
-    JsonCacheService<SubscriptionResource> jsonCacheService;
+    SubscriptionCacheReader subscriptionCacheReader;
 
     ConnectionGaugeCache cache;
 
@@ -50,15 +50,15 @@ class ConnectionGaugeCacheTest {
         meterRegistryMock = Mockito.mock(MeterRegistry.class);
         when(metricsHelperMock.getRegistry()).thenReturn(meterRegistryMock);
 
-        this.cache = new ConnectionGaugeCache(MockHelper.pulsarConfig, jsonCacheService, metricsHelperMock);
+        this.cache = new ConnectionGaugeCache(MockHelper.pulsarConfig, subscriptionCacheReader, metricsHelperMock);
     }
 
     @Test
-    void getOrCreateGaugeForSubscription() throws JsonCacheException {
+    void getOrCreateGaugeForSubscription() throws SubscriptionCacheReadException {
         final var gauge = new AtomicInteger(1);
 
         var subscription = createSubscriptionResource();
-        when(jsonCacheService.getByKey(subscription.spec.getSubscription().getSubscriptionId())).thenReturn(Optional.of(subscription));
+        when(subscriptionCacheReader.getById(subscription.spec.getSubscription().getSubscriptionId())).thenReturn(Optional.of(subscription));
         when(meterRegistryMock.gauge(anyString(), any(Iterable.class), any(Number.class))).thenReturn(gauge);
 
         {
