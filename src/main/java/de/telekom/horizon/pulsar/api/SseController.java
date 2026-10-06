@@ -4,6 +4,7 @@
 
 package de.telekom.horizon.pulsar.api;
 
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.StreamLimit;
 import de.telekom.horizon.pulsar.service.SseService;
@@ -76,7 +77,7 @@ public class SseController {
                                                             @RequestParam(defaultValue = "0") int maxMinutes,
                                                             @RequestParam(defaultValue = "0") int maxBytes,
                                                             @RequestHeader(value = "Last-Event-ID", required = false) String offset,
-                                                            @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException {
+                                                            @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) throws SubscriberDoesNotMatchSubscriptionException, SubscriptionCacheReadException {
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
 
         if (!Objects.equals(APPLICATION_STREAM_JSON_VALUE, accept) && !Objects.equals(MediaType.TEXT_EVENT_STREAM_VALUE, accept)) {
@@ -102,7 +103,7 @@ public class SseController {
      * @throws SubscriberDoesNotMatchSubscriptionException If the subscriber does not match the specified subscription.
      */
     @PostMapping(value = "/sse/{subscriptionId}/terminate", produces = {MediaType.ALL_VALUE, APPLICATION_STREAM_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
-    public ResponseEntity<Void> terminateSseStream(@PathVariable String environment, @PathVariable String subscriptionId) throws SubscriberDoesNotMatchSubscriptionException {
+    public ResponseEntity<Void> terminateSseStream(@PathVariable String environment, @PathVariable String subscriptionId) throws SubscriberDoesNotMatchSubscriptionException, SubscriptionCacheReadException {
 
         sseService.validateSubscriberIdForSubscription(environment, subscriptionId);
         sseService.stopEmittingEvents(subscriptionId);

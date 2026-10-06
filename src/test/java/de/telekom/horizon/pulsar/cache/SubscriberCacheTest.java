@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,5 +63,14 @@ class SubscriberCacheTest {
             var result = cache.getSubscriberId(MockHelper.TEST_SUBSCRIPTION_ID);
             assertThat(result.orElse(null)).isEqualTo(MockHelper.TEST_SUBSCRIBER_ID);
         }
+    }
+
+    @Test
+    void propagatesCacheReadFailure() throws SubscriptionCacheReadException {
+        var exception = new SubscriptionCacheReadException("cache unavailable");
+        when(subscriptionCacheReader.getById(MockHelper.TEST_SUBSCRIPTION_ID)).thenThrow(exception);
+
+        assertThatThrownBy(() -> cache.getSubscriberId(MockHelper.TEST_SUBSCRIPTION_ID))
+                .isSameAs(exception);
     }
 }

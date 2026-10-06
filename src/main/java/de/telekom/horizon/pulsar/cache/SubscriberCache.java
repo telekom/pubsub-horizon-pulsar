@@ -9,14 +9,12 @@ import de.telekom.eni.pandora.horizon.cache.service.SubscriptionCacheReader;
 import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.horizon.pulsar.config.PulsarConfig;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 @Component
-@Slf4j
 public class SubscriberCache {
 
     private final PulsarConfig pulsarConfig;
@@ -28,14 +26,8 @@ public class SubscriberCache {
         this.cache = cache;
     }
 
-    public Optional<String> getSubscriberId(String subscriptionId) {
-        Optional<SubscriptionResource> subscription = Optional.empty();
-        try {
-            subscription = cache.getById(subscriptionId);
-        } catch (SubscriptionCacheReadException e) {
-            log.error("Error occurred while reading subscription cache", e);
-        }
-
-        return subscription.map(subscriptionResource -> subscriptionResource.getSpec().getSubscription().getSubscriberId());
+    public Optional<String> getSubscriberId(String subscriptionId) throws SubscriptionCacheReadException {
+        return cache.getById(subscriptionId)
+                .map(subscriptionResource -> subscriptionResource.getSpec().getSubscription().getSubscriberId());
     }
 }

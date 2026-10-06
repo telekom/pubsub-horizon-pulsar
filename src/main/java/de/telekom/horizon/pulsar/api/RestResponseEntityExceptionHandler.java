@@ -6,6 +6,7 @@ package de.telekom.horizon.pulsar.api;
 
 import com.mongodb.MongoCommandException;
 import com.mongodb.MongoTimeoutException;
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.eni.pandora.horizon.model.common.ProblemMessage;
 import de.telekom.horizon.pulsar.exception.*;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,8 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     public static final String CACHE_INITIALIZATION_ERROR_TITLE = "Cache initialization failed. Please try again later.";
 
     public static final String CACHE_MONGODB_INITIALIZATION_ERROR_TITLE = "Cache and MongoDB initialization failed. Please try again later.";
+
+    public static final String SUBSCRIPTION_CACHE_READ_ERROR_TITLE = "Service is temporarily unavailable due to missing subscription data. Please retry.";
 
     private final ApplicationContext applicationContext;
 
@@ -104,6 +107,21 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     protected ResponseEntity<Object> handleServiceUnavailable(Exception e, WebRequest request) {
         return responseEntityForException(e, HttpStatus.SERVICE_UNAVAILABLE, TASK_NOT_STARTED_ERROR_TITLE, request, null);
+    }
+
+    /**
+     * Handles failures to read subscriptions from the subscription cache.
+     *
+     * @param e       The exception.
+     * @param request The web request.
+     * @return An HTTP 503 (Service Unavailable) response.
+     */
+    @ExceptionHandler(value = {
+            SubscriptionCacheReadException.class
+    })
+    protected ResponseEntity<Object> handleSubscriptionCacheReadException(Exception e, WebRequest request) {
+        log.warn("Could not read subscription cache for request {}: {}", request.getDescription(false), e.getMessage(), e);
+        return responseEntityForException(e, HttpStatus.SERVICE_UNAVAILABLE, SUBSCRIPTION_CACHE_READ_ERROR_TITLE, request, null);
     }
 
     /**
