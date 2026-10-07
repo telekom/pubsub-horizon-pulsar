@@ -17,15 +17,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RestResponseEntityExceptionHandlerTest {
 
     @Test
-    void subscriptionCacheReadFailureReturnsServiceUnavailable() {
+    void subscriptionCacheReadFailureReturnsInternalServerErrorLikeOtherUnhandledErrors() {
         var handler = new RestResponseEntityExceptionHandler(new GenericApplicationContext());
 
-        var response = handler.handleSubscriptionCacheReadException(
+        var response = handler.handleAny(
                 new SubscriptionCacheReadException("cache unavailable"),
                 new ServletWebRequest(new MockHttpServletRequest()));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isInstanceOfSatisfying(ProblemMessage.class, message ->
-                assertThat(message.getTitle()).isEqualTo(RestResponseEntityExceptionHandler.SUBSCRIPTION_CACHE_READ_ERROR_TITLE));
+                assertThat(message.getTitle()).isEqualTo(RestResponseEntityExceptionHandler.DEFAULT_ERROR_TITLE));
     }
 }
