@@ -7,6 +7,7 @@ package de.telekom.horizon.pulsar.service;
 import com.hazelcast.cluster.Endpoint;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.topic.ITopic;
+import de.telekom.eni.pandora.horizon.exception.SubscriptionCacheReadException;
 import de.telekom.horizon.pulsar.cache.ConnectionCache;
 import de.telekom.horizon.pulsar.exception.SubscriberDoesNotMatchSubscriptionException;
 import de.telekom.horizon.pulsar.helper.SseTaskStateContainer;
@@ -59,7 +60,7 @@ class SseServiceTest {
     }
 
     @Test
-    void testValidateSubscriberIdForSubscriberIdIsEqualToSubscriberCache() {
+    void testValidateSubscriberIdForSubscriberIdIsEqualToSubscriberCache() throws SubscriptionCacheReadException {
         when(MockHelper.pulsarConfig.isEnableSubscriberCheck()).thenReturn(true);
         when(MockHelper.tokenService.getSubscriberId()).thenReturn(MockHelper.TEST_SUBSCRIBER_ID);
 
