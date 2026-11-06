@@ -4,8 +4,6 @@
 
 package de.telekom.horizon.pulsar.service;
 
-import de.telekom.eni.pandora.horizon.cache.service.JsonCacheService;
-import de.telekom.eni.pandora.horizon.exception.JsonCacheException;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.Subscription;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResource;
 import de.telekom.eni.pandora.horizon.kubernetes.resource.SubscriptionResourceSpec;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -28,9 +25,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SseTaskFactoryTest {
-
-    @Mock
-    JsonCacheService<SubscriptionResource> jsonCacheService;
 
     SseTaskFactory sseTaskFactorySpy;
 
@@ -55,7 +49,7 @@ class SseTaskFactoryTest {
     }
 
     @Test
-    void testCreateNew () throws JsonCacheException {
+    void testCreateNew () {
         ArgumentCaptor<SseTask> sseTaskCaptor = ArgumentCaptor.forClass(SseTask.class);
 
         var sseTaskStateContainer = new SseTaskStateContainer();
